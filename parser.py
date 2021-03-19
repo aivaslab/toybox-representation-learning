@@ -23,4 +23,5 @@ def get_parser(desc):
 	parser.add_argument('--hypertune', '-ht', default = False, action = 'store_true')
 	parser.add_argument('--saveName', '-sn', default = "", type = str)
 	parser.add_argument('--saveRate', '-sr', default = -1, type = int)
+	parser.add_argument('--transform', '-tr', default = 1, type = int)
 	return parser.parse_args()

@@ -16,6 +16,43 @@ import parser
 outputDirectory = "./output/"
 
 
+def get_train_transform(tr):
+	s = 1
+	color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
+	if tr == 1:
+		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
+										  transforms.RandomHorizontalFlip(p = 0.5),
+										  transforms.RandomApply([color_jitter], p = 0.8),
+										  transforms.RandomGrayscale(p = 0.2),
+										  transforms.ToTensor(),
+										  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+	elif tr == 2:
+		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
+										  transforms.RandomHorizontalFlip(p = 0.5),
+										  transforms.RandomApply([color_jitter], p = 0.8),
+										  transforms.ToTensor(),
+										  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+
+	elif tr == 3:
+		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
+							transforms.RandomHorizontalFlip(p = 0.5),
+							transforms.ToTensor(),
+							transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+	elif tr == 4:
+		transform = transforms.Compose([transforms.ToPILImage(),
+							transforms.RandomHorizontalFlip(p = 0.5),
+							transforms.ToTensor(),
+							transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+	else:
+		transform = transforms.Compose([transforms.ToPILImage(),
+							transforms.RandomHorizontalFlip(p = 0.5),
+							transforms.RandomApply([color_jitter], p = 0.8),
+							transforms.ToTensor(),
+							transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+
+	return transform
+
+
 def info_nce_loss(features, dev):
 	batchSize = features.shape[0] / 2
 	labels = torch.cat([torch.arange(batchSize) for _ in range(2)], dim = 0)
@@ -59,13 +96,7 @@ def calc_accuracy(output, target, topk=(1,)):
 
 def learn_unsupervised(args, simclrNet, device):
 	numEpochs = args['epochs1']
-	s = 1
-	color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
-	transform_train = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 10),
-								transforms.RandomHorizontalFlip(p = 0.5),
-								transforms.RandomApply([color_jitter], p = 0.8), transforms.RandomGrayscale(p = 0.2),
-								transforms.ToTensor(),
-								transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+	transform_train = get_train_transform(args["transform"])
 
 	trainData = data_simclr(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
 							transform = transform_train, fraction = 1, distort = args['distort'], adj = args['adj'], hyperTune = args["hypertune"])
@@ -76,7 +107,7 @@ def learn_unsupervised(args, simclrNet, device):
 							   momentum = 0.9)
 	optimizer.add_param_group({'params': simclrNet.fc.parameters()})
 
-	scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = 100, eta_min = 0.001)
+	scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = 250, eta_min = 0.001)
 	show = False
 	for ep in range(numEpochs):
 		tqdmBar = tqdm.tqdm(trainDataLoader)
@@ -113,14 +144,7 @@ def learn_unsupervised(args, simclrNet, device):
 
 
 def learn_supervised(args, simclrNet, device):
-	s = 1
-	color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
-	transform_train = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
-										  transforms.RandomHorizontalFlip(p = 0.5),
-										  transforms.RandomApply([color_jitter], p = 0.8),
-										  transforms.RandomGrayscale(p = 0.2),
-										  transforms.ToTensor(),
-										  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+	transform_train = get_train_transform(args["transform"])
 
 	transform_test = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(),
 										 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -237,6 +261,7 @@ def set_seed(sd):
 
 
 def run_experiments(args):
+	print(torch.cuda.get_device_name(0))
 	args["start"] = datetime.datetime.now()
 	rng = set_seed(0)
 	args["rng"] = rng
