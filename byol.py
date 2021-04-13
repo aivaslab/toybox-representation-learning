@@ -9,7 +9,7 @@ import os
 import csv
 import datetime
 
-import network as simclr_net
+import network as net
 from dataset import data_simclr
 import parser
 
@@ -53,6 +53,13 @@ def get_train_transform(tr):
 	return transform
 
 
+def loss_fn(x, y):
+	x = F.normalize(x, dim=-1, p=2)
+	y = F.normalize(y, dim=-1, p=2)
+	loss = 2 - 2 * (x * y).sum(dim=-1)
+	return loss
+
+
 def info_nce_loss(features, dev):
 	batchSize = features.shape[0] / 2
 	labels = torch.cat([torch.arange(batchSize) for _ in range(2)], dim = 0)
@@ -94,18 +101,20 @@ def calc_accuracy(output, target, topk=(1,)):
 		return res, pred_1
 
 
-def learn_unsupervised(args, simclrNet, device):
+def learn_unsupervised(args, network, device):
 	numEpochs = args['epochs1']
 	transform_train = get_train_transform(args["transform"])
 
 	trainData = data_simclr(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
-							transform = transform_train, fraction = 1, distort = args['distort'], adj = args['adj'], hyperTune = args["hypertune"])
+							transform = transform_train, fraction = 0.1, distort = args['distort'], adj = args['adj'],
+							hyperTune = args["hypertune"])
 	trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size = args['batch_size'], shuffle = True,
 												  num_workers = 4)
 
-	optimizer = optimizers.SGD(simclrNet.backbone.parameters(), lr = args["lr"], weight_decay = 0.0005,
+	optimizer = optimizers.SGD(network.encoder_backbone.parameters(), lr = args["lr"], weight_decay = 0.0005,
 							   momentum = 0.9)
-	optimizer.add_param_group({'params': simclrNet.fc.parameters()})
+	optimizer.add_param_group({'params': network.encoder_projection.parameters()})
+	optimizer.add_param_group({'params': network.encoder_prediction.parameters()})
 
 	scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = 250, eta_min = 0.001)
 	show = False
@@ -113,23 +122,32 @@ def learn_unsupervised(args, simclrNet, device):
 		tqdmBar = tqdm.tqdm(trainDataLoader)
 		b = 0
 		avg_loss = 0.0
-		for _, images, _ in tqdmBar:
+		for _, (images1, images2), _ in tqdmBar:
 			b += 1
 			optimizer.zero_grad()
-			images = torch.cat(images, dim = 0)
 			if show:
-				im1 = transforms.ToPILImage()(images[0])
+				im1 = transforms.ToPILImage()(images1[0])
 				im1.show()
-				im2 = transforms.ToPILImage()(images[args['batch_size']])
+				im2 = transforms.ToPILImage()(images1[args['batch_size']])
 				im2.show()
 				show = False
-			images = images.to(device)
-			features = simclrNet(images)
-			logits, labels = info_nce_loss(features = features, dev = device)
-			loss = nn.CrossEntropyLoss().to(device)(logits, labels)
-			avg_loss = (avg_loss * (b - 1) + loss.item()) / b
+			images1 = images1.to(device)
+			images2 = images2.to(device)
+			# print(images1.shape, images2.shape)
+			features1 = network.encoder_forward(images1)
+			features2 = network.encoder_forward(images2)
+			with torch.no_grad():
+				targets1 = network.target_forward(images2)
+				targets2 = network.target_forward(images1)
+
+			loss = loss_fn(features1, targets1)
+			loss += loss_fn(features2, targets2)
+			loss = loss.mean()
+			avg_loss = (avg_loss * (b - 1) + loss) / b
 			loss.backward()
 			optimizer.step()
+			with torch.no_grad():
+				network.update_target_network()
 			tqdmBar.set_description("Epoch: {:d}/{:d}, Loss: {:.6f}, LR: {:.8f}".format(ep + 1, numEpochs, avg_loss,
 																						optimizer.param_groups[0][
 																							'lr']))
@@ -137,13 +155,13 @@ def learn_unsupervised(args, simclrNet, device):
 			scheduler.step()
 		if args["saveRate"] != -1 and (ep + 1) % args["saveRate"] == 0 and args["save"]:
 			fileName = args["saveName"] + "_unsupervised_" + str(ep + 1) + ".pt"
-			torch.save(simclrNet.state_dict(), fileName, _use_new_zipfile_serialization = False)
+			torch.save(network.state_dict(), fileName, _use_new_zipfile_serialization = False)
 	if args["save"]:
 		fileName = args["saveName"] + "_unsupervised_final.pt"
-		torch.save(simclrNet.state_dict(), fileName, _use_new_zipfile_serialization = False)
+		torch.save(network.state_dict(), fileName, _use_new_zipfile_serialization = False)
 
 
-def learn_supervised(args, simclrNet, device):
+def learn_supervised(args, network, device):
 	transform_train = get_train_transform(args["transform"])
 
 	transform_test = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(),
@@ -155,18 +173,14 @@ def learn_supervised(args, simclrNet, device):
 	testSet = data_simclr(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
 						  hyperTune = args["hypertune"], rng = args["rng"])
 	testLoader = torch.utils.data.DataLoader(testSet, batch_size = args['batch_size'], shuffle = False)
-	if args["freeze_backbone"]:
-		simclrNet.freeze_feat()
-	else:
-		simclrNet.freeze_head()
-	pytorch_total_params = sum(p.numel() for p in simclrNet.parameters())
-	pytorch_total_params_train = sum(p.numel() for p in simclrNet.parameters() if p.requires_grad)
+	pytorch_total_params = sum(p.numel() for p in network.parameters())
+	pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
 	print(pytorch_total_params, pytorch_total_params_train)
-	net = simclrNet.to(device)
+	network = network.to(device)
 
-	optimizer = torch.optim.SGD(net.classifier_fc.parameters(), lr = args["lr_ft"], weight_decay = 0.00005)
+	optimizer = torch.optim.SGD(network.classifier_fc.parameters(), lr = args["lr_ft"], weight_decay = 0.00005)
 	if not args["freeze_backbone"]:
-		optimizer.add_param_group({'params': simclrNet.backbone.parameters()})
+		optimizer.add_param_group({'params': network.backbone.parameters()})
 
 	numEpochsS = args['epochs2']
 
@@ -178,7 +192,7 @@ def learn_supervised(args, simclrNet, device):
 			images = images.to(device)
 			labels = labels.to(device)
 			optimizer.zero_grad()
-			logits = net.classify(images)
+			logits = network.classify(images)
 			loss = nn.CrossEntropyLoss()(logits, labels)
 			tot_loss += loss.item()
 			ep_id += 1
@@ -188,7 +202,7 @@ def learn_supervised(args, simclrNet, device):
 		if ep % 5 == 0:
 			optimizer.param_groups[0]['lr'] *= 0.7
 
-	net.eval()
+	network.eval()
 
 	if args["save"]:
 		fileName = args["saveName"] + "_test_predictions.csv"
@@ -208,7 +222,7 @@ def learn_supervised(args, simclrNet, device):
 		images = images.to(device)
 		labels = labels.to(device)
 		with torch.no_grad():
-			logits = net.classify(images)
+			logits = network.classify(images)
 		top, pred = calc_accuracy(logits, labels, topk = (1, 5))
 		top1acc += top[0].item() * pred.shape[0]
 		top5acc += top[1].item() * pred.shape[0]
@@ -230,7 +244,7 @@ def learn_supervised(args, simclrNet, device):
 		images = images.to(device)
 		labels = labels.to(device)
 		with torch.no_grad():
-			logits = net.classify(images)
+			logits = network.classify(images)
 		top, pred = calc_accuracy(logits, labels, topk = (1, 5))
 		top1acc += top[0].item() * indices.size()[0]
 		top5acc += top[1].item() * indices.size()[0]
@@ -247,7 +261,7 @@ def learn_supervised(args, simclrNet, device):
 
 	if args["save"]:
 		fileName = args["saveName"] + "_supervised.pt"
-		torch.save(simclrNet.state_dict(), fileName, _use_new_zipfile_serialization = False)
+		torch.save(network.state_dict(), fileName, _use_new_zipfile_serialization = False)
 		csvFileTrain.close()
 		csvFileTest.close()
 
@@ -272,7 +286,7 @@ def run_experiments(args):
 			args["saveName"] = "trained_model_cropped_" + args["distort"]
 	args["saveName"] = outputDirectory + args["saveName"]
 	device = torch.device('cuda:0')
-	network = simclr_net.SimClRNet(numClasses = 12).to(device)
+	network = net.BYOLNet(numClasses = 12).to(device)
 	if args["resume"]:
 		if args["resumeFile"] == "":
 			raise RuntimeError("No file provided for model to start from.")
@@ -285,11 +299,24 @@ def run_experiments(args):
 		print(args, file = configFile)
 		configFile.close()
 
-	learn_unsupervised(args = args, simclrNet = network, device = device)
+	network.freeze_classifier()
+	network.freeze_target_backbone()
+	network.freeze_target_projection()
+	network.unfreeze_encoder_backbone()
+	network.unfreeze_encoder_projection()
+	network.unfreeze_encoder_prediction()
+	network.train()
+	learn_unsupervised(args = args, network = network, device = device)
 	pytorch_total_params = sum(p.numel() for p in network.parameters())
 	pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
 	print(pytorch_total_params, pytorch_total_params_train)
-	learn_supervised(args = args, simclrNet = network, device = device)
+	network.unfreeze_classifier()
+	network.freeze_encoder_backbone()
+	network.freeze_encoder_projection()
+	network.freeze_encoder_prediction()
+	network.freeze_target_backbone()
+	network.freeze_target_projection()
+	learn_supervised(args = args, network = network, device = device)
 
 
 if __name__ == "__main__":
