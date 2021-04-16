@@ -14,6 +14,26 @@ from dataset import data_simclr
 import parser
 
 outputDirectory = "./output/"
+mean = (0.3499, 0.4374, 0.5199)
+std = (0.1623, 0.1894, 0.1775)
+
+class UnNormalize(object):
+	def __init__(self, mean, std):
+		self.mean = mean
+		self.std = std
+
+	def __call__(self, tensor):
+		"""
+		Args:
+			tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
+		Returns:
+			Tensor: Normalized image.
+		"""
+		for t, m, s in zip(tensor, self.mean, self.std):
+			t.mul_(s).add_(m)
+			# The normalize code -> t.sub_(m).div_(s)
+		return tensor
+
 
 
 def get_train_transform(tr):
@@ -25,30 +45,30 @@ def get_train_transform(tr):
 										  transforms.RandomApply([color_jitter], p = 0.8),
 										  transforms.RandomGrayscale(p = 0.2),
 										  transforms.ToTensor(),
-										  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+										  transforms.Normalize(mean, std)])
 	elif tr == 2:
 		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
 										  transforms.RandomHorizontalFlip(p = 0.5),
 										  transforms.RandomApply([color_jitter], p = 0.8),
 										  transforms.ToTensor(),
-										  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+										  transforms.Normalize(mean, std)])
 
 	elif tr == 3:
 		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
 							transforms.RandomHorizontalFlip(p = 0.5),
 							transforms.ToTensor(),
-							transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+							transforms.Normalize(mean, std)])
 	elif tr == 4:
 		transform = transforms.Compose([transforms.ToPILImage(),
 							transforms.RandomHorizontalFlip(p = 0.5),
 							transforms.ToTensor(),
-							transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+							transforms.Normalize(mean, std)])
 	else:
 		transform = transforms.Compose([transforms.ToPILImage(),
 							transforms.RandomHorizontalFlip(p = 0.5),
 							transforms.RandomApply([color_jitter], p = 0.8),
 							transforms.ToTensor(),
-							transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+							transforms.Normalize(mean, std)])
 
 	return transform
 
@@ -106,10 +126,10 @@ def learn_unsupervised(args, network, device):
 	transform_train = get_train_transform(args["transform"])
 
 	trainData = data_simclr(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
-							transform = transform_train, fraction = 1, distort = args['distort'], adj = args['adj'],
+							transform = transform_train, fraction = 0.1, distort = args['distort'], adj = args['adj'],
 							hyperTune = args["hypertune"])
 	trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size = args['batch_size'], shuffle = True,
-												  num_workers = 4)
+												  num_workers = 2)
 
 	optimizer = optimizers.SGD(network.encoder_backbone.parameters(), lr = args["lr"], weight_decay = 0.0005,
 							   momentum = 0.9)
@@ -126,9 +146,10 @@ def learn_unsupervised(args, network, device):
 			b += 1
 			optimizer.zero_grad()
 			if show:
-				im1 = transforms.ToPILImage()(images1[0])
+				unorm = UnNormalize(mean = mean, std = std)
+				im1 = transforms.ToPILImage()(unorm(images1[0]))
 				im1.show()
-				im2 = transforms.ToPILImage()(images1[args['batch_size']])
+				im2 = transforms.ToPILImage()(unorm(images2[0]))
 				im2.show()
 				show = False
 			images1 = images1.to(device)
@@ -165,7 +186,7 @@ def learn_supervised(args, network, device):
 	transform_train = get_train_transform(args["transform"])
 
 	transform_test = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(),
-										 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+										 transforms.Normalize(mean, std)])
 	trainSet = data_simclr(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
 						   fraction = args["frac"], hyperTune = args["hypertune"], rng = args["rng"])
 	trainLoader = torch.utils.data.DataLoader(trainSet, batch_size = args['batch_size'], shuffle = True)
@@ -277,7 +298,7 @@ def set_seed(sd):
 def run_experiments(args):
 	print(torch.cuda.get_device_name(0))
 	args["start"] = datetime.datetime.now()
-	rng = set_seed(0)
+	rng = set_seed(args["seed"])
 	args["rng"] = rng
 	if args["saveName"] == "":
 		if args["distort"] == "transform":
