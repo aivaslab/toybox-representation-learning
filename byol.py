@@ -126,7 +126,7 @@ def learn_unsupervised(args, network, device):
 	transform_train = get_train_transform(args["transform"])
 
 	trainData = data_simclr(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
-							transform = transform_train, fraction = 0.1, distort = args['distort'], adj = args['adj'],
+							transform = transform_train, fraction = 1, distort = args['distort'], adj = args['adj'],
 							hyperTune = args["hypertune"])
 	trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size = args['batch_size'], shuffle = True,
 												  num_workers = 2)
