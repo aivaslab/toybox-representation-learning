@@ -74,7 +74,7 @@ def get_train_transform(tr):
 	return transform
 
 
-def info_nce_loss(features, dev):
+def info_nce_loss(features, dev, temp):
 	batchSize = features.shape[0] / 2
 	labels = torch.cat([torch.arange(batchSize) for _ in range(2)], dim = 0)
 	labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
@@ -93,7 +93,7 @@ def info_nce_loss(features, dev):
 	logits = torch.cat([positives, negatives], dim = 1)
 	labels = torch.zeros(logits.shape[0], dtype = torch.long).to(dev)
 
-	logits = logits / 0.5
+	logits = logits / temp
 	return logits, labels
 
 
@@ -148,7 +148,7 @@ def learn_unsupervised(args, simclrNet, device):
 				show = False
 			images = images.to(device)
 			features = simclrNet(images)
-			logits, labels = info_nce_loss(features = features, dev = device)
+			logits, labels = info_nce_loss(features = features, dev = device, temp = args["temperature"])
 			loss = nn.CrossEntropyLoss().to(device)(logits, labels)
 			avg_loss = (avg_loss * (b - 1) + loss.item()) / b
 			loss.backward()
