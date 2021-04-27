@@ -10,7 +10,7 @@ def get_parser(desc):
 																						 ", use if continuing training")
 	parser.add_argument('--resumeFile', '-rf', default = "", type = str)
 	parser.add_argument('--seed', '-s', default = -1, type = int, help = "Seed for training")
-	parser.add_argument('--distort', '-d', choices = ['self', 'object', 'transform'], required = True, help = "Choose "
+	parser.add_argument('--distort', '-d', choices = ['self', 'object', 'transform'], help = "Choose "
 								"distortion for images. self for augmentations, object for other view of same object, "
 								"transform for other image of object from same video")
 	parser.add_argument('--lr', '-lr', default = 0.08, type = float, help = "Learning rate for unsupervised learning")
@@ -25,5 +25,8 @@ def get_parser(desc):
 	parser.add_argument('--saveRate', '-sr', default = -1, type = int)
 	parser.add_argument('--transform', '-tr', default = 1, type = int)
 	parser.add_argument('--temperature', '-t', default = 0.1, type = float)
+	parser.add_argument('--weight-decay', '-wd', default = 1e-6, type = float)
+	parser.add_argument('--epochsRan', '-er', default = -1, type = int)
+	parser.add_argument('--supervisedRep', '-rep', default = -1, type = int)
 
 	return parser.parse_args()

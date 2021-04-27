@@ -8,9 +8,11 @@ import numpy as np
 import os
 import csv
 import datetime
+import pickle
 
 import network as simclr_net
 from dataset import data_simclr
+from gaussian_blur import GaussianBlur
 import parser
 
 outputDirectory = "./output/"
@@ -36,40 +38,49 @@ class UnNormalize(object):
 		return tensor
 
 
-
 def get_train_transform(tr):
 	s = 1
 	color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
 	if tr == 1:
 		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
-										  transforms.RandomHorizontalFlip(p = 0.5),
-										  transforms.RandomApply([color_jitter], p = 0.8),
-										  transforms.RandomGrayscale(p = 0.2),
-										  transforms.ToTensor(),
-										  transforms.Normalize(mean, std)])
+										transforms.RandomHorizontalFlip(p = 0.5),
+										transforms.RandomApply([color_jitter], p = 0.8),
+										transforms.RandomGrayscale(p = 0.2),
+										GaussianBlur(kernel_size = 22),
+										transforms.ToTensor(),
+										transforms.Normalize(mean, std)])
 	elif tr == 2:
-		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
-										  transforms.RandomHorizontalFlip(p = 0.5),
-										  transforms.RandomApply([color_jitter], p = 0.8),
-										  transforms.ToTensor(),
-										  transforms.Normalize(mean, std)])
-
+		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomResizedCrop(size = 224,
+																							  scale = (0.75, 1.0)),
+										transforms.RandomHorizontalFlip(p = 0.5),
+										transforms.RandomApply([color_jitter], p = 0.8),
+										transforms.RandomGrayscale(p = 0.2),
+										GaussianBlur(kernel_size = 22),
+										transforms.ToTensor(),
+										transforms.Normalize(mean, std)])
 	elif tr == 3:
 		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
-							transforms.RandomHorizontalFlip(p = 0.5),
-							transforms.ToTensor(),
-							transforms.Normalize(mean, std)])
+										transforms.RandomHorizontalFlip(p = 0.5),
+										transforms.RandomApply([color_jitter], p = 0.8),
+										transforms.ToTensor(),
+										transforms.Normalize(mean, std)])
+
 	elif tr == 4:
+		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
+										transforms.RandomHorizontalFlip(p = 0.5),
+										transforms.ToTensor(),
+										transforms.Normalize(mean, std)])
+	elif tr == 5:
 		transform = transforms.Compose([transforms.ToPILImage(),
-							transforms.RandomHorizontalFlip(p = 0.5),
-							transforms.ToTensor(),
-							transforms.Normalize(mean, std)])
+										transforms.RandomHorizontalFlip(p = 0.5),
+										transforms.ToTensor(),
+										transforms.Normalize(mean, std)])
 	else:
 		transform = transforms.Compose([transforms.ToPILImage(),
-							transforms.RandomHorizontalFlip(p = 0.5),
-							transforms.RandomApply([color_jitter], p = 0.8),
-							transforms.ToTensor(),
-							transforms.Normalize(mean, std)])
+										transforms.RandomHorizontalFlip(p = 0.5),
+										transforms.RandomApply([color_jitter], p = 0.8),
+										transforms.ToTensor(),
+										transforms.Normalize(mean, std)])
 
 	return transform
 
@@ -125,12 +136,18 @@ def learn_unsupervised(args, simclrNet, device):
 	trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size = args['batch_size'], shuffle = True,
 												  num_workers = 2)
 
-	optimizer = optimizers.SGD(simclrNet.backbone.parameters(), lr = args["lr"], weight_decay = 0.0005,
+	optimizer = optimizers.SGD(simclrNet.backbone.parameters(), lr = args["lr"], weight_decay = args["weight_decay"],
 							   momentum = 0.9)
 	optimizer.add_param_group({'params': simclrNet.fc.parameters()})
 
-	scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = 250, eta_min = 0.001)
+	scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = int(1.25 * numEpochs),
+														   eta_min = 0.1*args["lr"])
 	show = False
+	train_losses = []
+	if args["resume"]:
+		for ep in range(args["epochsRan"]):
+			if ep > 8:
+				scheduler.step()
 	for ep in range(numEpochs):
 		tqdmBar = tqdm.tqdm(trainDataLoader)
 		b = 0
@@ -156,7 +173,9 @@ def learn_unsupervised(args, simclrNet, device):
 			tqdmBar.set_description("Epoch: {:d}/{:d}, Loss: {:.6f}, LR: {:.8f}".format(ep + 1, numEpochs, avg_loss,
 																						optimizer.param_groups[0][
 																							'lr']))
-		if ep > 8:
+
+		train_losses.append(avg_loss)
+		if args["resume"] or ep > 8:
 			scheduler.step()
 		if args["saveRate"] != -1 and (ep + 1) % args["saveRate"] == 0 and args["save"]:
 			fileName = args["saveName"] + "_unsupervised_" + str(ep + 1) + ".pt"
@@ -164,9 +183,13 @@ def learn_unsupervised(args, simclrNet, device):
 	if args["save"]:
 		fileName = args["saveName"] + "_unsupervised_final.pt"
 		torch.save(simclrNet.state_dict(), fileName, _use_new_zipfile_serialization = False)
+		fileName = args["saveName"] + "_train_losses.pickle"
+		f = open(fileName, "wb")
+		pickle.dump(train_losses, f, protocol = pickle.DEFAULT_PROTOCOL)
+		f.close()
 
 
-def learn_supervised(args, simclrNet, device):
+def learn_supervised(args, simclrNet, device, k):
 	transform_train = get_train_transform(args["transform"])
 
 	transform_test = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(),
@@ -187,7 +210,7 @@ def learn_supervised(args, simclrNet, device):
 	print(pytorch_total_params, pytorch_total_params_train)
 	net = simclrNet.to(device)
 
-	optimizer = torch.optim.SGD(net.classifier_fc.parameters(), lr = args["lr_ft"], weight_decay = 0.00005)
+	optimizer = torch.optim.SGD(net.classifier_fc.parameters(), lr = args["lr_ft"], weight_decay = args["weight_decay"])
 	if not args["freeze_backbone"]:
 		optimizer.add_param_group({'params': simclrNet.backbone.parameters()})
 
@@ -205,7 +228,8 @@ def learn_supervised(args, simclrNet, device):
 			loss = nn.CrossEntropyLoss()(logits, labels)
 			tot_loss += loss.item()
 			ep_id += 1
-			tqdmBar.set_description("Epoch: {:d}/{:d} Loss: {:.4f}".format(ep + 1, numEpochsS, tot_loss / ep_id))
+			tqdmBar.set_description("Repetition: {:d}/{:d} Epoch: {:d}/{:d} Loss: {:.4f}".format(k, args["supervisedRep"],
+																				ep + 1, numEpochsS, tot_loss / ep_id))
 			loss.backward()
 			optimizer.step()
 		if ep % 5 == 0:
@@ -223,6 +247,11 @@ def learn_supervised(args, simclrNet, device):
 		csvFileTrain = open(fileName, "w")
 		csvWriterTrain = csv.writer(csvFileTrain)
 		csvWriterTrain.writerow(["Index", "True Label", "Predicted Label"])
+
+		fileName = args["saveName"] + "_train_indices.pickle"
+		selectedIndicesFile = open(fileName, "wb")
+		pickle.dump(trainSet.indicesSelected, selectedIndicesFile, pickle.DEFAULT_PROTOCOL)
+		selectedIndicesFile.close()
 
 	top1acc = 0
 	top5acc = 0
@@ -274,8 +303,12 @@ def learn_supervised(args, simclrNet, device):
 		csvFileTrain.close()
 		csvFileTest.close()
 
+	return top1acc, top5acc
+
 
 def set_seed(sd):
+	if sd == -1:
+		sd = np.random.randint(0, 65536)
 	torch.manual_seed(sd)
 	torch.backends.cudnn.benchmark = False
 	torch.backends.cudnn.deterministic = True
@@ -283,7 +316,7 @@ def set_seed(sd):
 	return rng
 
 
-def run_experiments(args):
+def train_unsupervised_and_supervised(args):
 	print(torch.cuda.get_device_name(0))
 	args["start"] = datetime.datetime.now()
 	rng = set_seed(args["seed"])
@@ -299,24 +332,80 @@ def run_experiments(args):
 	if args["resume"]:
 		if args["resumeFile"] == "":
 			raise RuntimeError("No file provided for model to start from.")
+		if args["epochsRan"] == -1:
+			raise RuntimeError("Specify number of epochs ran for model which should be trained further.")
 		network.load_state_dict(torch.load(outputDirectory + args["resumeFile"]))
 		args["saveName"] = outputDirectory + args["resumeFile"]
 	network.freeze_classifier()
 	if args["save"]:
-		configFileName = args["saveName"] + "_config.txt"
-		configFile = open(configFileName, "w")
-		print(args, file = configFile)
+		configFileName = args["saveName"] + "_config.pickle"
+		configFile = open(configFileName, "wb")
+		pickle.dump(args, configFile, pickle.DEFAULT_PROTOCOL)
+		# print(args, file = configFile)
 		configFile.close()
 
 	learn_unsupervised(args = args, simclrNet = network, device = device)
 	pytorch_total_params = sum(p.numel() for p in network.parameters())
 	pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
 	print(pytorch_total_params, pytorch_total_params_train)
-	learn_supervised(args = args, simclrNet = network, device = device)
+	learn_supervised(args = args, simclrNet = network, device = device, k = 1)
+
+
+def evaluate_trained_network(args):
+	print(torch.cuda.get_device_name(0))
+	device = torch.device('cuda:0')
+	args["start"] = datetime.datetime.now()
+	args["saveName"] = outputDirectory + args["saveName"]
+	if not args["resume"]:
+		raise RuntimeError("Set resume flag and specify running file")
+	if args["supervisedRep"] < 1:
+		raise RuntimeError("Number of repetitions for supervised training must be > 0. Use \'-rep\' option to set.")
+	if args["resume"]:
+		if args["resumeFile"] == "":
+			raise RuntimeError("No file provided for model to start from.")
+		if args["saveName"] == "":
+			args["saveName"] = outputDirectory + args["resumeFile"]
+	saveName = args["saveName"]
+	print("Starting from ", args["resumeFile"])
+	accuracies = []
+	for i in range(args["supervisedRep"]):
+		args["saveName"] = saveName + "_" + str(i + 1)
+		rng = set_seed(args["seed"])
+		args["rng"] = rng
+		network = simclr_net.SimClRNet(numClasses = 12).to(device)
+		network.load_state_dict(torch.load(outputDirectory + args["resumeFile"]))
+		network.freeze_classifier()
+		if args["save"]:
+			configFileName = args["saveName"] + "_config.pickle"
+			configFile = open(configFileName, "wb")
+			pickle.dump(args, configFile, pickle.DEFAULT_PROTOCOL)
+			# print(args, file = configFile)
+			configFile.close()
+		pytorch_total_params = sum(p.numel() for p in network.parameters())
+		pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
+		print(pytorch_total_params, pytorch_total_params_train)
+		top1, top5 = learn_supervised(args = args, simclrNet = network, device = device, k = i + 1)
+		accuracies.append(top1)
+	print(accuracies, np.mean(np.asarray(accuracies)), np.std(np.asarray(accuracies)))
+	fileName = saveName + "_test_accuracies.csv"
+	acc_file = open(fileName, "w")
+	csv_acc = csv.writer(acc_file)
+	for acc in accuracies:
+		csv_acc.writerow([acc])
+	acc_file.close()
 
 
 if __name__ == "__main__":
 	if not os.path.isdir(outputDirectory):
 		os.mkdir(outputDirectory)
 	simclr_args = vars(parser.get_parser("SimCLR Parser"))
-	run_experiments(args = simclr_args)
+	saveName = simclr_args["saveName"]
+	num_reps = simclr_args["supervisedRep"]
+	simclr_args["supervisedRep"] = 1
+	train_unsupervised_and_supervised(args = simclr_args)
+
+	simclr_args["resume"] = True
+	simclr_args["resumeFile"] = saveName + "_unsupervised_final.pt"
+	simclr_args["saveName"] = saveName + "_eval"
+	simclr_args["supervisedRep"] = num_reps
+	evaluate_trained_network(args = simclr_args)

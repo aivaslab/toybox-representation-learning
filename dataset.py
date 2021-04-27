@@ -7,9 +7,11 @@ import torch
 import time
 import csv
 import pickle
+import math
 
 
-classes = ['airplane', 'ball', 'cat', 'cup', 'duck', 'giraffe', 'helicopter', 'horse', 'mug', 'spoon', 'truck']
+classes = ['airplane', 'ball', 'car', 'cat', 'cup', 'duck', 'giraffe', 'helicopter', 'horse', 'mug', 'spoon', 'truck']
+
 TEST_NO = {
 	'ball'      : [1, 7, 9],
 	'spoon'     : [5, 7, 8],
@@ -25,11 +27,26 @@ TEST_NO = {
 	'car'       : [6, 11, 13],
 }
 
+VAL_NO = {
+	'airplane': [30, 29, 28],
+	'ball': [30, 29, 28],
+	'car': [30, 29, 28],
+	'cat': [30, 29, 28],
+	'cup': [30, 29, 28],
+	'duck': [30, 29, 28],
+	'giraffe': [30, 29, 28],
+	'helicopter': [30, 29, 28],
+	'horse': [30, 29, 28],
+	'mug': [30, 29, 28],
+	'spoon': [30, 29, 28],
+	'truck': [30, 29, 28]
+}
+
 
 class data_simclr(torch.utils.data.Dataset):
 
 	def __init__(self, root, rng, train = True, transform = None, nViews = 2, size = 224, split =
-				"unsupervised", fraction = 1.0, distort = 'self', adj = -1, hyperTune = True):
+				"unsupervised", fraction = 1.0, distort = 'self', adj = -1, hyperTune = True, frac_by_object = False):
 
 		self.train = train
 		self.root = root
@@ -42,6 +59,7 @@ class data_simclr(torch.utils.data.Dataset):
 		self.adj = adj
 		self.hyperTune = hyperTune
 		self.rng = rng
+		self.objectsSelected = None
 		if not self.hyperTune:
 			self.trainImagesFile = "./data/toybox_data_cropped_train.pickle"
 			self.trainLabelsFile = "./data/toybox_data_cropped_train.csv"
@@ -61,10 +79,12 @@ class data_simclr(torch.utils.data.Dataset):
 					self.train_data = pickle.load(pickleFile)
 				with open(self.trainLabelsFile, "r") as csvFile:
 					self.train_csvFile = list(csv.DictReader(csvFile))
-
-				lenWholeData = len(self.train_data)
-				lenTrainData = int(self.fraction * lenWholeData)
-				self.indicesSelected = rng.choice(lenWholeData, lenTrainData, replace = False)
+				if frac_by_object:
+					self.indicesSelected = self.select_indices_object()
+				else:
+					lenWholeData = len(self.train_data)
+					lenTrainData = int(self.fraction * lenWholeData)
+					self.indicesSelected = rng.choice(lenWholeData, lenTrainData, replace = False)
 			else:
 				with open(self.testImagesFile, "rb") as pickleFile:
 					self.test_data = pickle.load(pickleFile)
@@ -74,9 +94,12 @@ class data_simclr(torch.utils.data.Dataset):
 					self.train_data = pickle.load(pickleFile)
 				with open(self.trainLabelsFile, "r") as csvFile:
 					self.train_csvFile = list(csv.DictReader(csvFile))
-				lenWholeData = len(self.train_data)
-				lenTrainData = int(self.fraction * lenWholeData)
-				self.indicesSelected = rng.choice(lenWholeData, lenTrainData, replace = False)
+				if frac_by_object:
+					self.indicesSelected = self.select_indices_object()
+				else:
+					lenWholeData = len(self.train_data)
+					lenTrainData = int(self.fraction * lenWholeData)
+					self.indicesSelected = rng.choice(lenWholeData, lenTrainData, replace = False)
 			else:
 				with open(self.testImagesFile, "rb") as pickleFile:
 					self.test_data = pickle.load(pickleFile)
@@ -84,9 +107,41 @@ class data_simclr(torch.utils.data.Dataset):
 					self.test_csvFile = list(csv.DictReader(csvFile))
 
 
+	def select_indices_object(self):
+		numObjectsPerClassTrain = 27 - 3 * self.hyperTune
+		numObjectsPerClassSelected = math.ceil(self.fraction * numObjectsPerClassTrain)
+		objectsSelected = {}
+		for cl in range(len(classes)):
+			objectsInTrain = []
+			for i in range(30):
+				if i not in TEST_NO[classes[cl]]:
+					if self.hyperTune:
+						if i not in VAL_NO[classes[cl]]:
+							objectsInTrain.append(i)
+					else:
+						objectsInTrain.append(i)
+			print(cl, objectsInTrain)
+			objectsSel = self.rng.choice(objectsInTrain, numObjectsPerClassSelected)
+			for obj in objectsSel:
+				assert(obj not in TEST_NO[classes[cl]])
+				if self.hyperTune:
+					assert(obj not in VAL_NO[classes[cl]])
+			print(objectsSel)
+			objectsSelected[cl] = objectsSel
+		self.objectsSelected = objectsSelected
+		indicesSelected = []
+		with open(self.trainLabelsFile, "r") as csvFile:
+			train_csvFile = list(csv.DictReader(csvFile))
+		for i in range(len(train_csvFile)):
+			cl, obj = train_csvFile[i]['Class ID'], train_csvFile[i]['Object']
+			if int(obj) in objectsSelected[int(cl)]:
+				indicesSelected.append(i)
+
+		return indicesSelected
+
 	def __len__(self):
 		if self.train:
-			return int(len(self.train_data) * self.fraction)
+			return len(self.indicesSelected)
 		else:
 			return len(self.test_data)
 
@@ -175,13 +230,15 @@ def online_mean_and_sd(loader):
 
 
 if __name__ == "__main__":
-	rng = np.random.default_rng(0)
+	rng = np.random.default_rng(5)
 	simclr = data_simclr(root = "./data", rng = rng, train = True, nViews = 2, size = 224,
-								transform = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]), fraction = 1,
-						 distort = "self", adj = -1,
-								hyperTune = True)
+								transform = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]), fraction = 0.1,
+						 distort = "self", adj = -1, hyperTune = True, frac_by_object = True)
 	trainDataLoader = torch.utils.data.DataLoader(simclr, batch_size = 64, shuffle = True,
 													  num_workers = 2)
 
-	mean, std = online_mean_and_sd(trainDataLoader)
-	print(mean, std)
+	print(len(simclr))
+
+
+	# mean, std = online_mean_and_sd(trainDataLoader)
+	# print(mean, std)

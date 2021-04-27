@@ -4,7 +4,7 @@ import copy
 
 
 def init_weights(m):
-	if type(m) == nn.Linear or type(m) ==  nn.Linear:
+	if type(m) == nn.Linear or type(m) == nn.Conv2d:
 		nn.init.xavier_uniform_(m.weight)
 		m.bias.data.fill_(0.01)
 
@@ -15,7 +15,7 @@ class SimClRNet(nn.Module):
 		super().__init__()
 		self.backbone = models.resnet18(pretrained = False, num_classes = 256)
 		feat_num = self.backbone.fc.in_features
-		self.fc = nn.Sequential(nn.Linear(feat_num, feat_num), nn.ReLU(inplace = True), nn.Linear(feat_num, 1024))
+		self.fc = nn.Sequential(nn.Linear(feat_num, 2*feat_num), nn.ReLU(inplace = True), nn.Linear(2*feat_num, 128))
 		self.backbone.fc = nn.Identity()
 		self.feat_num = feat_num
 		self.classifier_fc = nn.Linear(self.feat_num, numClasses)
@@ -40,7 +40,7 @@ class SimClRNet(nn.Module):
 		self.backbone.eval()
 		self.fc.eval()
 		self.classifier_fc.train()
-		print("Freezing backbone and head.")
+		print("Freezing backbone and unsupervised head.")
 
 	def freeze_classifier(self):
 		for name, param in self.backbone.named_parameters():
