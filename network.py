@@ -6,7 +6,8 @@ import copy
 def init_weights(m):
 	if type(m) == nn.Linear or type(m) == nn.Conv2d:
 		nn.init.xavier_uniform_(m.weight)
-		m.bias.data.fill_(0.01)
+		if m.bias is not None:
+			m.bias.data.fill_(0.01)
 
 
 class SimClRNet(nn.Module):
@@ -85,12 +86,12 @@ class BYOLNet(nn.Module):
 		self.beta = beta
 		feat_num = self.num_features
 		self.encoder_backbone.fc = nn.Identity()
-		self.encoder_projection = nn.Sequential(nn.Linear(in_features = feat_num, out_features = feat_num),
+		self.encoder_projection = nn.Sequential(nn.Linear(in_features = feat_num, out_features = 2*feat_num),
+												nn.BatchNorm1d(num_features = 2*feat_num), nn.ReLU(inplace = True),
+												nn.Linear(in_features = 2*feat_num, out_features = 128))
+		self.encoder_prediction = nn.Sequential(nn.Linear(in_features = 128, out_features = feat_num),
 												nn.BatchNorm1d(num_features = feat_num), nn.ReLU(inplace = True),
-												nn.Linear(in_features = feat_num, out_features = 1024))
-		self.encoder_prediction = nn.Sequential(nn.Linear(in_features = 1024, out_features = feat_num),
-												nn.BatchNorm1d(num_features = feat_num), nn.ReLU(inplace = True),
-												nn.Linear(in_features = feat_num, out_features = 1024))
+												nn.Linear(in_features = feat_num, out_features = 128))
 
 		self.classifier_fc = nn.Linear(feat_num, numClasses)
 		self.encoder_backbone.apply(init_weights)
