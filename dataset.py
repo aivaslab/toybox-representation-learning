@@ -178,7 +178,7 @@ class data_simclr(torch.utils.data.Dataset):
 				if self.adj == -1:
 					low, high = int(self.train_csvFile[actualIndex]['Tr Start']), int(
 						self.train_csvFile[actualIndex]['Tr End'])
-					id2 = self.rng.randint(low, high)
+					id2 = self.rng.integers(low = low, high = high + 1, size = 1)[0]
 				else:
 					low = max(0, actualIndex - self.adj)
 					high = min(int(len(self.train_data) * self.fraction) - 1, actualIndex + self.adj)
