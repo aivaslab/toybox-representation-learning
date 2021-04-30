@@ -16,7 +16,7 @@ class SimClRNet(nn.Module):
 		super().__init__()
 		self.backbone = models.resnet18(pretrained = False, num_classes = 256)
 		feat_num = self.backbone.fc.in_features
-		self.fc = nn.Sequential(nn.Linear(feat_num, 2*feat_num), nn.ReLU(inplace = True), nn.Linear(2*feat_num, 128))
+		self.fc = nn.Sequential(nn.Linear(feat_num, feat_num), nn.ReLU(inplace = True), nn.Linear(feat_num, 128))
 		self.backbone.fc = nn.Identity()
 		self.feat_num = feat_num
 		self.classifier_fc = nn.Linear(self.feat_num, numClasses)

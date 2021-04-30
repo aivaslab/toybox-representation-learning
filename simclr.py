@@ -12,6 +12,7 @@ import pickle
 
 import network as simclr_net
 from dataset import data_simclr
+from dataset_core50 import data_core50
 from gaussian_blur import GaussianBlur
 import parser
 
@@ -46,7 +47,7 @@ def get_train_transform(tr):
 										transforms.RandomHorizontalFlip(p = 0.5),
 										transforms.RandomApply([color_jitter], p = 0.8),
 										transforms.RandomGrayscale(p = 0.2),
-										GaussianBlur(kernel_size = 22),
+										# GaussianBlur(kernel_size = 22),
 										transforms.ToTensor(),
 										transforms.Normalize(mean, std)])
 	elif tr == 2:
@@ -55,7 +56,7 @@ def get_train_transform(tr):
 										transforms.RandomHorizontalFlip(p = 0.5),
 										transforms.RandomApply([color_jitter], p = 0.8),
 										transforms.RandomGrayscale(p = 0.2),
-										GaussianBlur(kernel_size = 22),
+										# GaussianBlur(kernel_size = 22),
 										transforms.ToTensor(),
 										transforms.Normalize(mean, std)])
 	elif tr == 3:
@@ -130,8 +131,8 @@ def learn_unsupervised(args, simclrNet, device):
 	numEpochs = args['epochs1']
 	transform_train = get_train_transform(args["transform"])
 
-	trainData = data_simclr(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
-							transform = transform_train, fraction = 1, distort = args['distort'], adj = args['adj'],
+	trainData = data_core50(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
+							transform = transform_train, fraction = args["frac1"], distort = args['distort'], adj = args['adj'],
 							hyperTune = args["hypertune"])
 	trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size = args['batch_size'], shuffle = True,
 												  num_workers = 2)
@@ -194,11 +195,11 @@ def learn_supervised(args, simclrNet, device, k):
 
 	transform_test = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(),
 										 transforms.Normalize(mean, std)])
-	trainSet = data_simclr(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
-						   fraction = args["frac"], hyperTune = args["hypertune"], rng = args["rng"])
+	trainSet = data_core50(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
+						   fraction = args["frac2"], hyperTune = args["hypertune"], rng = args["rng"])
 	trainLoader = torch.utils.data.DataLoader(trainSet, batch_size = args['batch_size'], shuffle = True)
 
-	testSet = data_simclr(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
+	testSet = data_core50(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
 						  hyperTune = args["hypertune"], rng = args["rng"])
 	testLoader = torch.utils.data.DataLoader(testSet, batch_size = args['batch_size'], shuffle = False)
 	if args["freeze_backbone"]:
@@ -403,9 +404,9 @@ if __name__ == "__main__":
 	num_reps = simclr_args["supervisedRep"]
 	simclr_args["supervisedRep"] = 1
 	train_unsupervised_and_supervised(args = simclr_args)
-
-	simclr_args["resume"] = True
-	simclr_args["resumeFile"] = saveName + "_unsupervised_final.pt"
-	simclr_args["saveName"] = saveName + "_eval"
-	simclr_args["supervisedRep"] = num_reps
-	evaluate_trained_network(args = simclr_args)
+	if num_reps > 0:
+		simclr_args["resume"] = True
+		simclr_args["resumeFile"] = saveName + "_unsupervised_final.pt"
+		simclr_args["saveName"] = saveName + "_eval"
+		simclr_args["supervisedRep"] = num_reps
+		evaluate_trained_network(args = simclr_args)
