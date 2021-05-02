@@ -11,7 +11,7 @@ import datetime
 import pickle
 
 import network as simclr_net
-from dataset import data_simclr
+from dataset_toybox import data_toybox
 from dataset_core50 import data_core50
 from gaussian_blur import GaussianBlur
 import parser
@@ -131,9 +131,15 @@ def learn_unsupervised(args, simclrNet, device):
 	numEpochs = args['epochs1']
 	transform_train = get_train_transform(args["transform"])
 
-	trainData = data_core50(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
-							transform = transform_train, fraction = args["frac1"], distort = args['distort'], adj = args['adj'],
-							hyperTune = args["hypertune"])
+	if args["dataset"] == "core50":
+		trainData = data_core50(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
+								transform = transform_train, fraction = args["frac1"], distort = args['distort'], adj = args['adj'],
+								hyperTune = args["hypertune"], split_by_sess = args["sessionSplit"])
+	else:
+		trainData = data_toybox(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
+								transform = transform_train, fraction = args["frac1"], distort = args['distort'], adj = args['adj'],
+								hyperTune = args["hypertune"])
+
 	trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size = args['batch_size'], shuffle = True,
 												  num_workers = 2)
 
@@ -195,12 +201,21 @@ def learn_supervised(args, simclrNet, device, k):
 
 	transform_test = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(),
 										 transforms.Normalize(mean, std)])
-	trainSet = data_core50(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
-						   fraction = args["frac2"], hyperTune = args["hypertune"], rng = args["rng"])
+	if args["dataset"] == "core50":
+		trainSet = data_core50(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
+						  	 fraction = args["frac2"], hyperTune = args["hypertune"], rng = args["rng"],
+							 split_by_sess = args["sessionSplit"])
+	else:
+		trainSet = data_toybox(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
+							   fraction = args["frac2"], hyperTune = args["hypertune"], rng = args["rng"])
 	trainLoader = torch.utils.data.DataLoader(trainSet, batch_size = args['batch_size'], shuffle = True)
 
-	testSet = data_core50(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
-						  hyperTune = args["hypertune"], rng = args["rng"])
+	if args["dataset"] == "core50":
+		testSet = data_core50(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
+						  hyperTune = args["hypertune"], rng = args["rng"], split_by_sess = args["sessionSplit"])
+	else:
+		testSet = data_toybox(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
+							  hyperTune = args["hypertune"], rng = args["rng"])
 	testLoader = torch.utils.data.DataLoader(testSet, batch_size = args['batch_size'], shuffle = False)
 	if args["freeze_backbone"]:
 		simclrNet.freeze_feat()
@@ -400,6 +415,7 @@ if __name__ == "__main__":
 	if not os.path.isdir(outputDirectory):
 		os.mkdir(outputDirectory)
 	simclr_args = vars(parser.get_parser("SimCLR Parser"))
+	assert (simclr_args["dataset"] == "core50" or simclr_args["dataset"] == "toybox")
 	saveName = simclr_args["saveName"]
 	num_reps = simclr_args["supervisedRep"]
 	simclr_args["supervisedRep"] = 1

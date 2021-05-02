@@ -29,5 +29,7 @@ def get_parser(desc):
 	parser.add_argument('--weight-decay', '-wd', default = 1e-6, type = float)
 	parser.add_argument('--epochsRan', '-er', default = -1, type = int)
 	parser.add_argument('--supervisedRep', '-rep', default = -1, type = int)
+	parser.add_argument('--dataset', '-data', required = True, type = str)
+	parser.add_argument('--sessionSplit', '-sess', default = False, action = 'store_true')
 
 	return parser.parse_args()

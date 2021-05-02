@@ -60,16 +60,6 @@ class data_simclr(torch.utils.data.Dataset):
 		self.hyperTune = hyperTune
 		self.rng = rng
 		self.objectsSelected = None
-		if not self.hyperTune:
-			self.trainImagesFile = "./data/toybox_data_cropped_train.pickle"
-			self.trainLabelsFile = "./data/toybox_data_cropped_train.csv"
-			self.testImagesFile = "./data/toybox_data_cropped_test.pickle"
-			self.testLabelsFile = "./data/toybox_data_cropped_test.csv"
-		else:
-			self.trainImagesFile = "./data/toybox_data_cropped_dev.pickle"
-			self.trainLabelsFile = "./data/toybox_data_cropped_dev.csv"
-			self.testImagesFile = "./data/toybox_data_cropped_val.pickle"
-			self.testLabelsFile = "./data/toybox_data_cropped_val.csv"
 
 		super().__init__()
 		assert(distort == 'self' or distort == 'object' or distort == 'transform')
@@ -108,6 +98,7 @@ class data_simclr(torch.utils.data.Dataset):
 
 
 	def select_indices_object(self):
+		raise NotImplementedError
 		numObjectsPerClassTrain = 27 - 3 * self.hyperTune
 		numObjectsPerClassSelected = math.ceil(self.fraction * numObjectsPerClassTrain)
 		objectsSelected = {}
@@ -167,7 +158,8 @@ class data_simclr(torch.utils.data.Dataset):
 					imgs = [img, img]
 
 			elif self.distort == 'object':
-				low, high = int(self.train_csvFile[actualIndex]['Obj Start']), int(self.train_csvFile[actualIndex]['Obj End'])
+				low, high = int(self.train_csvFile[actualIndex][self.obj_start_key]), \
+							int(self.train_csvFile[actualIndex][self.obj_end_key])
 				id2 = self.rng.integers(low = low, high = high + 1, size = 1)[0]
 				img2 = np.array(cv2.imdecode(self.train_data[id2], 3))
 				if self.transform is not None:
@@ -176,23 +168,21 @@ class data_simclr(torch.utils.data.Dataset):
 					imgs = [img, img2]
 			else:
 				if self.adj == -1:
-					low, high = int(self.train_csvFile[actualIndex]['Tr Start']), int(
-						self.train_csvFile[actualIndex]['Tr End'])
+					low, high = int(self.train_csvFile[actualIndex][self.tr_start_key]), int(
+						self.train_csvFile[actualIndex][self.tr_end_key])
 					id2 = self.rng.integers(low = low, high = high + 1, size = 1)[0]
 				else:
 					low = max(0, actualIndex - self.adj)
-					high = min(int(len(self.train_data) * self.fraction) - 1, actualIndex + self.adj)
+					high = min(int(len(self.train_data)) - 1, actualIndex + self.adj)
 					try:
-						if self.train_csvFile[low]['Transformation'] != self.train_csvFile[actualIndex]['Transformation']:
+						if self.train_csvFile[low][self.tr_key] != self.train_csvFile[actualIndex][self.tr_key]:
 							id2 = high
-						elif self.train_csvFile[high]['Transformation'] != self.train_csvFile[actualIndex]['Transformation']:
+						elif self.train_csvFile[high][self.tr_key] != self.train_csvFile[actualIndex][self.tr_key]:
 							id2 = low
 						else:
-							id2 = self.rng.choice([low, high])
+							id2 = self.rng.integers(low = low, high = high + 1, size = 1)[0]
 					except IndexError:
 						print(low, actualIndex, high)
-				# print(actualIndex, id2, self.train_csvFile[actualIndex]['Transformation'] ==
-				#	  self.train_csvFile[id2]['Transformation'])
 				img2 = np.array(cv2.imdecode(self.train_data[id2], 3))
 				if self.transform is not None:
 					imgs = [self.transform(img), self.transform(img2)]
@@ -206,39 +196,3 @@ class data_simclr(torch.utils.data.Dataset):
 		return actualIndex, imgs, int(label)
 
 
-def online_mean_and_sd(loader):
-	"""Compute the mean and sd in an online fashion
-
-		Var[x] = E[X^2] - E^2[X]
-	"""
-	cnt = 0
-	fst_moment = torch.empty(3)
-	snd_moment = torch.empty(3)
-
-	for _, (data, _), _ in loader:
-		print(data.shape)
-		b, c, h, w = data.shape
-		nb_pixels = b * h * w
-		sum_ = torch.sum(data, dim=[0, 2, 3])
-		sum_of_square = torch.sum(data ** 2, dim=[0, 2, 3])
-		fst_moment = (cnt * fst_moment + sum_) / (cnt + nb_pixels)
-		snd_moment = (cnt * snd_moment + sum_of_square) / (cnt + nb_pixels)
-
-		cnt += nb_pixels
-
-	return fst_moment, torch.sqrt(snd_moment - fst_moment ** 2)
-
-
-if __name__ == "__main__":
-	rng = np.random.default_rng(5)
-	simclr = data_simclr(root = "./data", rng = rng, train = True, nViews = 2, size = 224,
-								transform = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]), fraction = 0.1,
-						 distort = "self", adj = -1, hyperTune = True, frac_by_object = True)
-	trainDataLoader = torch.utils.data.DataLoader(simclr, batch_size = 64, shuffle = True,
-													  num_workers = 2)
-
-	print(len(simclr))
-
-
-	# mean, std = online_mean_and_sd(trainDataLoader)
-	# print(mean, std)
