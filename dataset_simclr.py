@@ -46,7 +46,8 @@ VAL_NO = {
 class data_simclr(torch.utils.data.Dataset):
 
 	def __init__(self, root, rng, train = True, transform = None, nViews = 2, size = 224, split =
-				"unsupervised", fraction = 1.0, distort = 'self', adj = -1, hyperTune = True, frac_by_object = False):
+				"unsupervised", fraction = 1.0, distort = 'self', adj = -1, hyperTune = True, frac_by_object = False,
+				 distortArg = False):
 
 		self.train = train
 		self.root = root
@@ -60,9 +61,10 @@ class data_simclr(torch.utils.data.Dataset):
 		self.hyperTune = hyperTune
 		self.rng = rng
 		self.objectsSelected = None
+		self.distortArg = distortArg
 
 		super().__init__()
-		assert(distort == 'self' or distort == 'object' or distort == 'transform')
+		assert(distort == 'self' or distort == 'object' or distort == 'transform' or distort == 'class')
 		if self.split == "unsupervised":
 			if self.train:
 				with open(self.trainImagesFile, "rb") as pickleFile:
@@ -166,6 +168,15 @@ class data_simclr(torch.utils.data.Dataset):
 					imgs = [self.transform(img), self.transform(img2)]
 				else:
 					imgs = [img, img2]
+			elif self.distort == 'class':
+				low, high = int(self.train_csvFile[actualIndex][self.cl_start_key]), \
+							int(self.train_csvFile[actualIndex][self.cl_end_key])
+				id2 = self.rng.integers(low = low, high = high + 1, size = 1)[0]
+				img2 = np.array(cv2.imdecode(self.train_data[id2], 3))
+				if self.transform is not None:
+					imgs = [self.transform(img), self.transform(img2)]
+				else:
+					imgs = [img, img2]
 			else:
 				if self.adj == -1:
 					low, high = int(self.train_csvFile[actualIndex][self.tr_start_key]), int(
@@ -180,7 +191,10 @@ class data_simclr(torch.utils.data.Dataset):
 						elif self.train_csvFile[high][self.tr_key] != self.train_csvFile[actualIndex][self.tr_key]:
 							id2 = low
 						else:
-							id2 = self.rng.integers(low = low, high = high + 1, size = 1)[0]
+							if self.distortArg:
+								id2 = self.rng.choice([low, high], 1)[0]
+							else:
+								id2 = self.rng.integers(low = low, high = high + 1, size = 1)[0]
 					except IndexError:
 						print(low, actualIndex, high)
 				img2 = np.array(cv2.imdecode(self.train_data[id2], 3))

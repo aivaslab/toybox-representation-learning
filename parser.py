@@ -10,9 +10,10 @@ def get_parser(desc):
 																						 ", use if continuing training")
 	parser.add_argument('--resumeFile', '-rf', default = "", type = str)
 	parser.add_argument('--seed', '-s', default = -1, type = int, help = "Seed for training")
-	parser.add_argument('--distort', '-d', choices = ['self', 'object', 'transform'], help = "Choose "
+	parser.add_argument('--distort', '-d', choices = ['self', 'object', 'transform', 'class'], help = "Choose "
 								"distortion for images. self for augmentations, object for other view of same object, "
-								"transform for other image of object from same video")
+								"transform for other image of object from same video, class for image from any other"
+								"frame of same class.")
 	parser.add_argument('--lr', '-lr', default = 0.08, type = float, help = "Learning rate for unsupervised learning")
 	parser.add_argument('--lr-ft', '-lr_ft', default = 0.01, type = float, help = "Learning rate for supervised "
 																				   "training.")
@@ -31,5 +32,6 @@ def get_parser(desc):
 	parser.add_argument('--supervisedRep', '-rep', default = -1, type = int)
 	parser.add_argument('--dataset', '-data', required = True, type = str)
 	parser.add_argument('--sessionSplit', '-sess', default = False, action = 'store_true')
+	parser.add_argument('--distortArg', '-da', default = False, action = 'store_true')
 
 	return parser.parse_args()

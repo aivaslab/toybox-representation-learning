@@ -134,11 +134,12 @@ def learn_unsupervised(args, simclrNet, device):
 	if args["dataset"] == "core50":
 		trainData = data_core50(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
 								transform = transform_train, fraction = args["frac1"], distort = args['distort'], adj = args['adj'],
-								hyperTune = args["hypertune"], split_by_sess = args["sessionSplit"])
+								hyperTune = args["hypertune"], split_by_sess = args["sessionSplit"],
+								distortArg = args["distortArg"])
 	else:
 		trainData = data_toybox(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
 								transform = transform_train, fraction = args["frac1"], distort = args['distort'], adj = args['adj'],
-								hyperTune = args["hypertune"])
+								hyperTune = args["hypertune"], distortArg = args["distortArg"])
 
 	trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size = args['batch_size'], shuffle = True,
 												  num_workers = 2)

@@ -47,12 +47,15 @@ VAL_NO = {
 class data_toybox(data_simclr):
 
 	def __init__(self, root, rng, train = True, transform = None, nViews = 2, size = 224, split =
-				"unsupervised", fraction = 1.0, distort = 'self', adj = -1, hyperTune = True, frac_by_object = False):
+				"unsupervised", fraction = 1.0, distort = 'self', adj = -1, hyperTune = True, frac_by_object = False,
+				 distortArg = False):
 		self.tr_start_key = 'Tr Start'
 		self.tr_end_key = 'Tr End'
 		self.obj_start_key = 'Obj Start'
 		self.obj_end_key = 'Obj End'
 		self.tr_key = 'Transformation'
+		self.cl_start_key = 'CL Start'
+		self.cl_end_key = 'CL End'
 		if not hyperTune:
 			self.trainImagesFile = "./data/toybox_data_cropped_train.pickle"
 			self.trainLabelsFile = "./data/toybox_data_cropped_train.csv"
@@ -66,7 +69,7 @@ class data_toybox(data_simclr):
 
 		super().__init__(root = root, rng = rng, train = train, transform = transform, nViews = nViews, size = size,
 						 split = split, fraction = fraction, distort = distort, adj = adj, hyperTune = hyperTune,
-						 frac_by_object = frac_by_object)
+						 frac_by_object = frac_by_object, distortArg = distortArg)
 
 
 	def select_indices_object(self):
