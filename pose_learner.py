@@ -154,9 +154,11 @@ def learn_unsupervised(args, simclrNet, device):
 														   eta_min = 0.1*args["lr"])
 	show = False
 	train_losses = []
-	# loss_fn = nn.modules.loss.TripletMarginWithDistanceLoss(distance_function = lambda x, y: 1.0 - F.cosine_similarity(x, y),
-						#					   margin = args['margin'], p = 2)
-	loss_fn = nn.TripletMarginLoss(margin = args['margin'], p = 2)
+	if args['loss'] == 'cosine':
+		loss_fn = nn.TripletMarginWithDistanceLoss(distance_function = lambda x, y: 1.0 - F.cosine_similarity(x, y),
+											   margin = args['margin'])
+	else:
+		loss_fn = nn.TripletMarginLoss(margin = args['margin'], p = 2)
 	if args["resume"]:
 		for ep in range(args["epochsRan"]):
 			if ep > 8:

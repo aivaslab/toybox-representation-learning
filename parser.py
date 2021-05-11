@@ -34,5 +34,6 @@ def get_parser(desc):
 	parser.add_argument('--sessionSplit', '-sess', default = False, action = 'store_true')
 	parser.add_argument('--distortArg', '-da', default = False, action = 'store_true')
 	parser.add_argument('--margin', '-m', default = 1.0, type = float)
+	parser.add_argument('--loss', '-l', default = 'cosine', type = str)
 
 	return parser.parse_args()
