@@ -9,7 +9,7 @@ import os
 import csv
 import datetime
 import pickle
-
+import utils
 import network as simclr_net
 from dataset_toybox import data_toybox
 from dataset_core50 import data_core50
@@ -19,24 +19,6 @@ import parser
 outputDirectory = "./output/"
 mean = (0.3499, 0.4374, 0.5199)
 std = (0.1623, 0.1894, 0.1775)
-
-
-class UnNormalize(object):
-	def __init__(self, mean, std):
-		self.mean = mean
-		self.std = std
-
-	def __call__(self, tensor):
-		"""
-		Args:
-			tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
-		Returns:
-			Tensor: Normalized image.
-		"""
-		for t, m, s in zip(tensor, self.mean, self.std):
-			t.mul_(s).add_(m)
-			# The normalize code -> t.sub_(m).div_(s)
-		return tensor
 
 
 def get_train_transform(tr):
@@ -86,48 +68,7 @@ def get_train_transform(tr):
 	return transform
 
 
-def info_nce_loss(features, dev, temp):
-	batchSize = features.shape[0] / 2
-	labels = torch.cat([torch.arange(batchSize) for _ in range(2)], dim = 0)
-	labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
-	labels = labels.to(dev)
-
-	features = F.normalize(features, dim = 1)
-
-	similarity_matrix = torch.matmul(features, torch.transpose(features, 0, 1))
-	# discard the main diagonal from both: labels and similarities matrix
-	mask = torch.eye(labels.shape[0], dtype = torch.bool).to(dev)
-	labels = labels[~mask].view(labels.shape[0], -1)
-	similarity_matrix = similarity_matrix[~mask].view(similarity_matrix.shape[0], -1)
-	positives = similarity_matrix[labels.bool()].view(labels.shape[0], -1)
-	negatives = similarity_matrix[~labels.bool()].view(similarity_matrix.shape[0], -1)
-
-	logits = torch.cat([positives, negatives], dim = 1)
-	labels = torch.zeros(logits.shape[0], dtype = torch.long).to(dev)
-
-	logits = logits / temp
-	return logits, labels
-
-
-def calc_accuracy(output, target, topk=(1,)):
-	"""Computes the accuracy over the k top predictions for the specified values of k"""
-	with torch.no_grad():
-		maxk = max(topk)
-		batchSize = target.size(0)
-
-		_, pred = output.topk(maxk, 1, True, True)
-		pred = pred.t()
-		target_reshaped = torch.reshape(target, (1, -1)).repeat(maxk, 1)
-		correct_top_k = torch.eq(pred, target_reshaped)
-		pred_1 = pred[0]
-		res = []
-		for k in topk:
-			correct_k = correct_top_k[:k].reshape(-1).float().sum(0, keepdim=True)
-			res.append(torch.mul(correct_k, 100.0 / batchSize))
-		return res, pred_1
-
-
-def learn_unsupervised(args, simclrNet, device):
+def learn_unsupervised(args, simclrNet, devices):
 	numEpochs = args['epochs1']
 	transform_train = get_train_transform(args["transform"])
 
@@ -142,7 +83,7 @@ def learn_unsupervised(args, simclrNet, device):
 								hyperTune = args["hypertune"], distortArg = args["distortArg"])
 
 	trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size = args['batch_size'], shuffle = True,
-												  num_workers = 2)
+												  num_workers = args['workers'])
 
 	optimizer = optimizers.SGD(simclrNet.backbone.parameters(), lr = args["lr"], weight_decay = args["weight_decay"],
 							   momentum = 0.9)
@@ -156,6 +97,8 @@ def learn_unsupervised(args, simclrNet, device):
 		for ep in range(args["epochsRan"]):
 			if ep > 8:
 				scheduler.step()
+
+	netParallel = nn.DataParallel(simclrNet, device_ids = devices)
 	for ep in range(numEpochs):
 		tqdmBar = tqdm.tqdm(trainDataLoader)
 		b = 0
@@ -165,16 +108,16 @@ def learn_unsupervised(args, simclrNet, device):
 			optimizer.zero_grad()
 			images = torch.cat(images, dim = 0)
 			if show:
-				unorm = UnNormalize(mean = mean, std = std)
+				unorm = utils.UnNormalize(mean = mean, std = std)
 				im1 = transforms.ToPILImage()(unorm(images[0]))
 				im1.show()
 				im2 = transforms.ToPILImage()(unorm(images[args['batch_size']]))
 				im2.show()
 				show = False
-			images = images.to(device)
-			features = simclrNet(images)
-			logits, labels = info_nce_loss(features = features, dev = device, temp = args["temperature"])
-			loss = nn.CrossEntropyLoss().to(device)(logits, labels)
+			# images = images.to(device)
+			features = netParallel(images)
+			logits, labels = utils.info_nce_loss(features = features, temp = args["temperature"])
+			loss = nn.CrossEntropyLoss()(logits, labels)
 			avg_loss = (avg_loss * (b - 1) + loss.item()) / b
 			loss.backward()
 			optimizer.step()
@@ -190,6 +133,7 @@ def learn_unsupervised(args, simclrNet, device):
 			torch.save(simclrNet.state_dict(), fileName, _use_new_zipfile_serialization = False)
 	if args["save"]:
 		fileName = args["saveName"] + "_unsupervised_final.pt"
+		print("Saving network weights to", fileName)
 		torch.save(simclrNet.state_dict(), fileName, _use_new_zipfile_serialization = False)
 		fileName = args["saveName"] + "_train_losses.pickle"
 		f = open(fileName, "wb")
@@ -197,7 +141,7 @@ def learn_unsupervised(args, simclrNet, device):
 		f.close()
 
 
-def learn_supervised(args, simclrNet, device, k):
+def learn_supervised(args, simclrNet, devices, k):
 	transform_train = get_train_transform(args["transform"])
 
 	transform_test = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(),
@@ -209,7 +153,8 @@ def learn_supervised(args, simclrNet, device, k):
 	else:
 		trainSet = data_toybox(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
 							   fraction = args["frac2"], hyperTune = args["hypertune"], rng = args["rng"])
-	trainLoader = torch.utils.data.DataLoader(trainSet, batch_size = args['batch_size'], shuffle = True)
+	trainLoader = torch.utils.data.DataLoader(trainSet, batch_size = args['batch_size'], shuffle = True, num_workers =
+											  args['workers'])
 
 	if args["dataset"] == "core50":
 		testSet = data_core50(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
@@ -217,17 +162,18 @@ def learn_supervised(args, simclrNet, device, k):
 	else:
 		testSet = data_toybox(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
 							  hyperTune = args["hypertune"], rng = args["rng"])
-	testLoader = torch.utils.data.DataLoader(testSet, batch_size = args['batch_size'], shuffle = False)
+	testLoader = torch.utils.data.DataLoader(testSet, batch_size = args['batch_size'], shuffle = False, num_workers =
+											  args['workers'])
 	if args["freeze_backbone"]:
 		simclrNet.freeze_feat()
 	else:
 		simclrNet.freeze_head()
 	pytorch_total_params = sum(p.numel() for p in simclrNet.parameters())
 	pytorch_total_params_train = sum(p.numel() for p in simclrNet.parameters() if p.requires_grad)
-	print(pytorch_total_params, pytorch_total_params_train)
-	net = simclrNet.to(device)
+	print(str(pytorch_total_params_train) + "/" + str(pytorch_total_params) + " parameters are trainable.")
+	net = nn.DataParallel(simclrNet, device_ids = devices)
 
-	optimizer = torch.optim.SGD(net.classifier_fc.parameters(), lr = args["lr_ft"], weight_decay = args["weight_decay"])
+	optimizer = torch.optim.SGD(simclrNet.classifier_fc.parameters(), lr = args["lr_ft"], weight_decay = args["weight_decay"])
 	if not args["freeze_backbone"]:
 		optimizer.add_param_group({'params': simclrNet.backbone.parameters()})
 
@@ -238,18 +184,18 @@ def learn_supervised(args, simclrNet, device, k):
 		tot_loss = 0
 		tqdmBar = tqdm.tqdm(trainLoader)
 		for _, images, labels in tqdmBar:
-			images = images.to(device)
-			labels = labels.to(device)
 			optimizer.zero_grad()
-			logits = net.classify(images)
-			loss = nn.CrossEntropyLoss()(logits, labels)
+			logits = net(images)
+			loss = nn.CrossEntropyLoss()(logits, labels.cuda())
 			tot_loss += loss.item()
 			ep_id += 1
-			tqdmBar.set_description("Repetition: {:d}/{:d} Epoch: {:d}/{:d} Loss: {:.4f}".format(k, args["supervisedRep"],
-																				ep + 1, numEpochsS, tot_loss / ep_id))
+			tqdmBar.set_description("Repetition: {:d}/{:d} Epoch: {:d}/{:d} Loss: {:.4f}, LR: {:.8f}".format(k,
+																				args["supervisedRep"],
+																				ep + 1, numEpochsS, tot_loss / ep_id,
+																				optimizer.param_groups[0]['lr']))
 			loss.backward()
 			optimizer.step()
-		if ep % 5 == 0:
+		if ep % 5 == 0 and ep > 0:
 			optimizer.param_groups[0]['lr'] *= 0.7
 
 	net.eval()
@@ -274,11 +220,9 @@ def learn_supervised(args, simclrNet, device, k):
 	top5acc = 0
 	totTrainPoints = 0
 	for _, (indices, images, labels) in enumerate(trainLoader):
-		images = images.to(device)
-		labels = labels.to(device)
 		with torch.no_grad():
-			logits = net.classify(images)
-		top, pred = calc_accuracy(logits, labels, topk = (1, 5))
+			logits = net(images)
+		top, pred = utils.calc_accuracy(logits, labels.cuda(), topk = (1, 5))
 		top1acc += top[0].item() * pred.shape[0]
 		top5acc += top[1].item() * pred.shape[0]
 		totTrainPoints += pred.shape[0]
@@ -296,11 +240,9 @@ def learn_supervised(args, simclrNet, device, k):
 	top5acc = 0
 	totTestPoints = 0
 	for _, (indices, images, labels) in enumerate(testLoader):
-		images = images.to(device)
-		labels = labels.to(device)
 		with torch.no_grad():
-			logits = net.classify(images)
-		top, pred = calc_accuracy(logits, labels, topk = (1, 5))
+			logits = net(images)
+		top, pred = utils.calc_accuracy(logits, labels.cuda(), topk = (1, 5))
 		top1acc += top[0].item() * indices.size()[0]
 		top5acc += top[1].item() * indices.size()[0]
 		totTestPoints += indices.size()[0]
@@ -316,6 +258,7 @@ def learn_supervised(args, simclrNet, device, k):
 
 	if args["save"]:
 		fileName = args["saveName"] + "_supervised.pt"
+		print("Saving network weights to:", fileName)
 		torch.save(simclrNet.state_dict(), fileName, _use_new_zipfile_serialization = False)
 		csvFileTrain.close()
 		csvFileTest.close()
@@ -335,6 +278,8 @@ def set_seed(sd):
 
 def train_unsupervised_and_supervised(args):
 	print(torch.cuda.get_device_name(0))
+	numGPUs = torch.cuda.device_count()
+	deviceIDs = [i for i in range(numGPUs)]
 	args["start"] = datetime.datetime.now()
 	rng = set_seed(args["seed"])
 	args["rng"] = rng
@@ -344,8 +289,8 @@ def train_unsupervised_and_supervised(args):
 		else:
 			args["saveName"] = "trained_model_cropped_" + args["distort"]
 	args["saveName"] = outputDirectory + args["saveName"]
-	device = torch.device('cuda:0')
-	network = simclr_net.SimClRNet(numClasses = 12).to(device)
+	# device = torch.device('cuda:0')
+	network = simclr_net.SimClRNet(numClasses = 12)
 	if args["resume"]:
 		if args["resumeFile"] == "":
 			raise RuntimeError("No file provided for model to start from.")
@@ -361,16 +306,21 @@ def train_unsupervised_and_supervised(args):
 		# print(args, file = configFile)
 		configFile.close()
 
-	learn_unsupervised(args = args, simclrNet = network, device = device)
 	pytorch_total_params = sum(p.numel() for p in network.parameters())
 	pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
-	print(pytorch_total_params, pytorch_total_params_train)
-	learn_supervised(args = args, simclrNet = network, device = device, k = 1)
+	print(str(pytorch_total_params_train) + "/" + str(pytorch_total_params) + " parameters are trainable.")
+	learn_unsupervised(args = args, simclrNet = network, devices = deviceIDs)
+
+	pytorch_total_params = sum(p.numel() for p in network.parameters())
+	pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
+	print(str(pytorch_total_params_train) + "/" + str(pytorch_total_params) + " parameters are trainable.")
+	network.unsupervised = False
+	learn_supervised(args = args, simclrNet = network, devices = deviceIDs, k = 1)
 
 
 def evaluate_trained_network(args):
-	print(torch.cuda.get_device_name(0))
-	device = torch.device('cuda:0')
+	numGPUs = torch.cuda.device_count()
+	deviceIDs = [i for i in range(numGPUs)]
 	args["start"] = datetime.datetime.now()
 	args["saveName"] = outputDirectory + args["saveName"]
 	if not args["resume"]:
@@ -383,33 +333,42 @@ def evaluate_trained_network(args):
 		if args["saveName"] == "":
 			args["saveName"] = outputDirectory + args["resumeFile"]
 	saveName = args["saveName"]
-	print("Starting from ", args["resumeFile"])
 	accuracies = []
 	for i in range(args["supervisedRep"]):
+		print("------------------------------------------------------------------------------------------------")
+		print("Repetition " + str(i + 1) + " of " + str(args["supervisedRep"]))
 		args["saveName"] = saveName + "_" + str(i + 1)
 		rng = set_seed(args["seed"])
 		args["rng"] = rng
-		network = simclr_net.SimClRNet(numClasses = 12).to(device)
+		network = simclr_net.SimClRNet(numClasses = 12).cuda()
 		network.load_state_dict(torch.load(outputDirectory + args["resumeFile"]))
+		print("Loaded network weights from", args["resumeFile"])
 		network.freeze_classifier()
+		network.unsupervised = False
 		if args["save"]:
 			configFileName = args["saveName"] + "_config.pickle"
 			configFile = open(configFileName, "wb")
 			pickle.dump(args, configFile, pickle.DEFAULT_PROTOCOL)
 			# print(args, file = configFile)
 			configFile.close()
+
 		pytorch_total_params = sum(p.numel() for p in network.parameters())
 		pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
-		print(pytorch_total_params, pytorch_total_params_train)
-		top1, top5 = learn_supervised(args = args, simclrNet = network, device = device, k = i + 1)
+		print(str(pytorch_total_params_train) + "/" + str(pytorch_total_params) + " parameters are trainable.")
+		top1, top5 = learn_supervised(args = args, simclrNet = network, devices = deviceIDs, k = i + 1)
 		accuracies.append(top1)
-	print(accuracies, np.mean(np.asarray(accuracies)), np.std(np.asarray(accuracies)))
-	fileName = saveName + "_test_accuracies.csv"
-	acc_file = open(fileName, "w")
-	csv_acc = csv.writer(acc_file)
-	for acc in accuracies:
-		csv_acc.writerow([acc])
-	acc_file.close()
+		print("------------------------------------------------------------------------------------------------")
+	print("The accuracies on the test set are:", accuracies)
+	print("Mean accuracy on test set is", np.mean(np.asarray(accuracies)))
+	print("Std. deviation of accuracy on test set is", np.std(np.asarray(accuracies)))
+	if args["save"]:
+		fileName = saveName + "_test_accuracies.csv"
+		acc_file = open(fileName, "w")
+		csv_acc = csv.writer(acc_file)
+		for acc in accuracies:
+			csv_acc.writerow([acc])
+		acc_file.close()
+	return np.mean(np.asarray(accuracies))
 
 
 if __name__ == "__main__":

@@ -20,15 +20,14 @@ class SimClRNet(nn.Module):
 		self.backbone.fc = nn.Identity()
 		self.feat_num = feat_num
 		self.classifier_fc = nn.Linear(self.feat_num, numClasses)
+		self.unsupervised = True
 
 	def forward(self, x):
 		y = self.backbone(x)
-		y = self.fc(y)
-		return y
-
-	def classify(self, x):
-		y = self.backbone(x)
-		y = self.classifier_fc(y)
+		if self.unsupervised:
+			y = self.fc(y)
+		else:
+			y = self.classifier_fc(y)
 		return y
 
 	def freeze_feat(self):

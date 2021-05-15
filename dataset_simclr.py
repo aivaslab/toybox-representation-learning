@@ -10,39 +10,6 @@ import pickle
 import math
 
 
-classes = ['airplane', 'ball', 'car', 'cat', 'cup', 'duck', 'giraffe', 'helicopter', 'horse', 'mug', 'spoon', 'truck']
-
-TEST_NO = {
-	'ball'      : [1, 7, 9],
-	'spoon'     : [5, 7, 8],
-	'mug'       : [12, 13, 14],
-	'cup'       : [12, 13, 15],
-	'giraffe'   : [1, 5, 13],
-	'horse'     : [1, 10, 15],
-	'cat'       : [4, 9, 15],
-	'duck'      : [5, 9, 13],
-	'helicopter': [5, 10, 15],
-	'airplane'  : [2, 6, 15],
-	'truck'     : [2, 6, 8],
-	'car'       : [6, 11, 13],
-}
-
-VAL_NO = {
-	'airplane': [30, 29, 28],
-	'ball': [30, 29, 28],
-	'car': [30, 29, 28],
-	'cat': [30, 29, 28],
-	'cup': [30, 29, 28],
-	'duck': [30, 29, 28],
-	'giraffe': [30, 29, 28],
-	'helicopter': [30, 29, 28],
-	'horse': [30, 29, 28],
-	'mug': [30, 29, 28],
-	'spoon': [30, 29, 28],
-	'truck': [30, 29, 28]
-}
-
-
 class data_simclr(torch.utils.data.Dataset):
 
 	def __init__(self, root, rng, train = True, transform = None, nViews = 2, size = 224, split =
