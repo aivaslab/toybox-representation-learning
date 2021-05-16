@@ -178,6 +178,7 @@ def learn_supervised(args, simclrNet, devices, k):
 		optimizer.add_param_group({'params': simclrNet.backbone.parameters()})
 
 	numEpochsS = args['epochs2']
+	repEval = 10
 
 	for ep in range(numEpochsS):
 		ep_id = 0
@@ -197,6 +198,37 @@ def learn_supervised(args, simclrNet, devices, k):
 			optimizer.step()
 		if ep % 5 == 0 and ep > 0:
 			optimizer.param_groups[0]['lr'] *= 0.7
+
+		if ep % repEval == repEval - 1:
+			top1acc = 0
+			top5acc = 0
+			totTrainPoints = 0
+			for _, (indices, images, labels) in enumerate(trainLoader):
+				with torch.no_grad():
+					logits = net(images)
+				top, pred = utils.calc_accuracy(logits, labels.cuda(), topk = (1, 5))
+				top1acc += top[0].item() * pred.shape[0]
+				top5acc += top[1].item() * pred.shape[0]
+				totTrainPoints += pred.shape[0]
+			top1acc /= totTrainPoints
+			top5acc /= totTrainPoints
+
+			print("Train Accuracies 1 and 5:", top1acc, top5acc)
+
+			top1acc = 0
+			top5acc = 0
+			totTestPoints = 0
+			for _, (indices, images, labels) in enumerate(testLoader):
+				with torch.no_grad():
+					logits = net(images)
+				top, pred = utils.calc_accuracy(logits, labels.cuda(), topk = (1, 5))
+				top1acc += top[0].item() * indices.size()[0]
+				top5acc += top[1].item() * indices.size()[0]
+				totTestPoints += indices.size()[0]
+			top1acc /= totTestPoints
+			top5acc /= totTestPoints
+
+			print("Test Accuracies 1 and 5:", top1acc, top5acc)
 
 	net.eval()
 
