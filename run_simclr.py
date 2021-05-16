@@ -42,7 +42,7 @@ mean_accs = []
 default_args['resume'] = True
 default_args['resumeFile'] = "temp_unsupervised_final.pt"
 default_args['lr_ft'] = exp_args['lr_fts'][0]
-default_args['supervisedRep'] = 2
+default_args['supervisedRep'] = 7
 default_args['save'] = False
 default_args['saveName'] = ""
 
