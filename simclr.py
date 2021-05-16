@@ -306,10 +306,11 @@ def train_unsupervised_and_supervised(args):
 		# print(args, file = configFile)
 		configFile.close()
 
-	pytorch_total_params = sum(p.numel() for p in network.parameters())
-	pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
-	print(str(pytorch_total_params_train) + "/" + str(pytorch_total_params) + " parameters are trainable.")
-	learn_unsupervised(args = args, simclrNet = network, devices = deviceIDs)
+	if args['epochs1'] > 0:
+		pytorch_total_params = sum(p.numel() for p in network.parameters())
+		pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
+		print(str(pytorch_total_params_train) + "/" + str(pytorch_total_params) + " parameters are trainable.")
+		learn_unsupervised(args = args, simclrNet = network, devices = deviceIDs)
 
 	pytorch_total_params = sum(p.numel() for p in network.parameters())
 	pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
