@@ -15,7 +15,7 @@ def get_parser(desc):
 	parser.add_argument('--dataset', '-data', default = "toybox", type = str)
 	parser.add_argument('--tempName', '-tn', required = True, type = str)
 	parser.add_argument('--batch_size', '-b', default = 128, type = int)
-	parser.add_argument('--temperature', default = 0.1, type = float)
+	parser.add_argument('--temperature', '-t', default = 0.1, type = float)
 	parser.add_argument('--epochs1', '-e1', default = 100, type = int)
 	parser.add_argument('--epochs2', '-e2', default = 60, type = int, help = "Number of epochs of supervised training")
 
@@ -29,7 +29,7 @@ default_args = {'batch_size': exp_args['batch_size'], 'epochs1': exp_args['epoch
 				'resume': False, 'resumeFile': "", 'seed': -1, 'distort': exp_args['distort'], 'adj': -1, 'lr': exp_args['lr'],
 				'lr_ft': exp_args['lr_fts'][0],
 				'save': True, 'frac1': 1.0, 'frac2': 0.1, 'freeze_backbone': True, 'hypertune': True,
-				'saveName': "temp", 'saveRate': -1, 'transform' : 1, 'temperature': 0.1, 'weight_decay': 1e-6,
+				'saveName': exp_args['tempName'], 'saveRate': -1, 'transform' : 1, 'temperature': 0.1, 'weight_decay': 1e-6,
 				'epochsRan': -1, 'supervisedRep': 1, 'dataset' : exp_args['dataset'], 'distortArg': False, 'workers': 4}
 
 simclr.train_unsupervised_and_supervised(args = default_args)
@@ -38,9 +38,9 @@ simclr.train_unsupervised_and_supervised(args = default_args)
 print("------------------------------------------------------------------------------------------------")
 print("Running supervised training for", len(exp_args['lr_fts']), "different learning rates")
 mean_accs = []
-
+saveName = exp_args['tempName']
 default_args['resume'] = True
-default_args['resumeFile'] = "temp_unsupervised_final.pt"
+default_args['resumeFile'] = saveName + "_unsupervised_final.pt"
 default_args['lr_ft'] = exp_args['lr_fts'][0]
 default_args['supervisedRep'] = 7
 default_args['save'] = False
