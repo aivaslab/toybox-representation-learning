@@ -37,10 +37,10 @@ class TripletMarginWithDistanceLoss:
 		return torch.clamp(positive_dist - negative_dist + self.margin, min = 0.0).mean()
 
 
-def info_nce_loss(features, temp):
+def triple_info_nce_loss(features, temp):
 	dev = torch.device('cuda:0')
-	batchSize = features.shape[0] / 2
-	labels = torch.cat([torch.arange(batchSize) for _ in range(2)], dim = 0)
+	batchSize = features.shape[0] / 3
+	labels = torch.cat([torch.arange(batchSize) for _ in range(3)], dim = 0)
 	labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
 	labels = labels.to(dev)
 
@@ -48,17 +48,37 @@ def info_nce_loss(features, temp):
 
 	similarity_matrix = torch.matmul(features, torch.transpose(features, 0, 1))
 	# discard the main diagonal from both: labels and similarities matrix
+	mask = torch.eye(labels.shape[0], dtype = torch.uint8).to(dev)
+	labels = labels[~mask].view(labels.shape[0], -1).type(torch.uint8)
+	similarity_matrix = similarity_matrix[~mask].view(similarity_matrix.shape[0], -1)
+	positives = similarity_matrix[labels].view(labels.shape[0], -1)
+	negatives = similarity_matrix[~labels].view(similarity_matrix.shape[0], -1)
+	logits = torch.cat([positives, negatives], dim = 1)
+	labels1 = torch.zeros(logits.shape[0], dtype = torch.long).to(dev)
+	labels2 = torch.ones(logits.shape[0], dtype = torch.long).to(dev)
+
+	logits = logits / temp
+	return logits, labels1, labels2
+
+
+def info_nce_loss(features, temp):
+	dev = torch.device('cuda:0')
+	batchSize = features.shape[0] / 2
+	labels = torch.cat([torch.arange(batchSize) for _ in range(2)], dim = 0)
+	labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
+	labels = labels.to(dev)
+	features = F.normalize(features, dim = 1)
+	similarity_matrix = torch.matmul(features, torch.transpose(features, 0, 1))
+	# discard the main diagonal from both: labels and similarities matrix
 	mask = torch.eye(labels.shape[0], dtype = torch.bool).to(dev)
 	labels = labels[~mask].view(labels.shape[0], -1).type(torch.uint8)
-	# print(labels)
 	similarity_matrix = similarity_matrix[~mask].view(similarity_matrix.shape[0], -1)
 	positives = similarity_matrix[labels.bool()].view(labels.shape[0], -1)
 	negatives = similarity_matrix[~labels.bool()].view(similarity_matrix.shape[0], -1)
-
 	logits = torch.cat([positives, negatives], dim = 1)
 	labels = torch.zeros(logits.shape[0], dtype = torch.long).to(dev)
-
 	logits = logits / temp
+	# raise NotImplementedError()
 	return logits, labels
 
 

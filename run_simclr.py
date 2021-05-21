@@ -16,7 +16,7 @@ def get_parser(desc):
 	parser.add_argument('--tempName', '-tn', required = True, type = str)
 	parser.add_argument('--batch_size', '-b', default = 128, type = int)
 	parser.add_argument('--temperature', '-t', default = 0.1, type = float)
-	parser.add_argument('--epochs1', '-e1', default = 100, type = int)
+	parser.add_argument('--epochs1', '-e1', default = 50, type = int)
 	parser.add_argument('--epochs2', '-e2', default = 60, type = int, help = "Number of epochs of supervised training")
 
 	return parser.parse_args()
@@ -42,7 +42,7 @@ saveName = exp_args['tempName']
 default_args['resume'] = True
 default_args['resumeFile'] = saveName + "_unsupervised_final.pt"
 default_args['lr_ft'] = exp_args['lr_fts'][0]
-default_args['supervisedRep'] = 7
+default_args['supervisedRep'] = 3
 default_args['save'] = False
 default_args['saveName'] = ""
 
@@ -56,4 +56,29 @@ for rep in range(len(exp_args['lr_fts'])):
 	mean_accs.append(mean_acc)
 
 print("The mean accuracies over the different evaluations are:", mean_accs)
+
+
+print("------------------------------------------------------------------------------------------------")
+print("Running supervised training for", len(exp_args['lr_fts']), "different learning rates with unfrozen resnet")
+mean_accs = []
+saveName = exp_args['tempName']
+default_args['resume'] = True
+default_args['resumeFile'] = saveName + "_unsupervised_final.pt"
+default_args['lr_ft'] = exp_args['lr_fts'][0]
+default_args['supervisedRep'] = 3
+default_args['save'] = False
+default_args['saveName'] = ""
+default_args['freeze_backbone'] = False
+
+for rep in range(len(exp_args['lr_fts'])):
+	print("Starting supervised training for lr_fts[" + str(rep + 1) + "]: " + str(exp_args['lr_fts'][rep]))
+	default_args['lr_ft'] = exp_args['lr_fts'][rep]
+	print("------------------------------------------------------------------------------------------------")
+	print("Starting linear evaluation for", default_args['supervisedRep'], 'reps')
+	mean_acc = simclr.evaluate_trained_network(args = default_args)
+	print("------------------------------------------------------------------------------------------------")
+	mean_accs.append(mean_acc)
+
+print("The mean accuracies over the different evaluations are:", mean_accs)
+print("Total time:", time.time() - start_time, "seconds")
 print("Total time:", time.time() - start_time, "seconds")
