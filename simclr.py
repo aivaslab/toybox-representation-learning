@@ -322,7 +322,10 @@ def train_unsupervised_and_supervised(args):
 			args["saveName"] = "trained_model_cropped_" + args["distort"]
 	args["saveName"] = outputDirectory + args["saveName"]
 	# device = torch.device('cuda:0')
-	network = simclr_net.SimClRNet(numClasses = 12)
+	if args["data"] == "toybox":
+		network = simclr_net.SimClRNet(numClasses = 12).cuda()
+	else:
+		network = simclr_net.SimClRNet(numClasses = 10).cuda()
 	if args["resume"]:
 		if args["resumeFile"] == "":
 			raise RuntimeError("No file provided for model to start from.")
@@ -373,7 +376,10 @@ def evaluate_trained_network(args):
 		args["saveName"] = saveName + "_" + str(i + 1)
 		rng = set_seed(args["seed"])
 		args["rng"] = rng
-		network = simclr_net.SimClRNet(numClasses = 12).cuda()
+		if args["data"] == "toybox":
+			network = simclr_net.SimClRNet(numClasses = 12).cuda()
+		else:
+			network = simclr_net.SimClRNet(numClasses = 10).cuda()
 		network.load_state_dict(torch.load(outputDirectory + args["resumeFile"]))
 		print("Loaded network weights from", args["resumeFile"])
 		network.freeze_classifier()

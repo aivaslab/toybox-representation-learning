@@ -10,6 +10,15 @@ def init_weights(m):
 			m.bias.data.fill_(0.01)
 
 
+class Identity(nn.Module):
+
+	def __init__(self):
+		super(Identity, self).__init__()
+
+	def __call__(self, x):
+		return x
+
+
 class SimClRNet(nn.Module):
 
 	def __init__(self, numClasses):
@@ -17,7 +26,7 @@ class SimClRNet(nn.Module):
 		self.backbone = models.resnet18(pretrained = False, num_classes = 256)
 		feat_num = self.backbone.fc.in_features
 		self.fc = nn.Sequential(nn.Linear(feat_num, feat_num), nn.ReLU(inplace = True), nn.Linear(feat_num, 128))
-		self.backbone.fc = nn.Identity()
+		self.backbone.fc = Identity()
 		self.feat_num = feat_num
 		self.classifier_fc = nn.Linear(self.feat_num, numClasses)
 		self.unsupervised = True
@@ -73,6 +82,15 @@ class SimClRNet(nn.Module):
 			param.requires_grad = True
 		for name, param in self.classifier_fc.named_parameters():
 			param.requires_grad = True
+
+	def freeze_all_params(self):
+		for name, param in self.backbone.named_parameters():
+			param.requires_grad = False
+		for name, param in self.fc.named_parameters():
+			param.requires_grad = False
+		for name, param in self.classifier_fc.named_parameters():
+			param.requires_grad = False
+
 
 
 class BYOLNet(nn.Module):
