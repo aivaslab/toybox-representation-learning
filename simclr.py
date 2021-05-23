@@ -322,7 +322,7 @@ def train_unsupervised_and_supervised(args):
 			args["saveName"] = "trained_model_cropped_" + args["distort"]
 	args["saveName"] = outputDirectory + args["saveName"]
 	# device = torch.device('cuda:0')
-	if args["data"] == "toybox":
+	if args["dataset"] == "toybox":
 		network = simclr_net.SimClRNet(numClasses = 12).cuda()
 	else:
 		network = simclr_net.SimClRNet(numClasses = 10).cuda()
@@ -376,7 +376,7 @@ def evaluate_trained_network(args):
 		args["saveName"] = saveName + "_" + str(i + 1)
 		rng = set_seed(args["seed"])
 		args["rng"] = rng
-		if args["data"] == "toybox":
+		if args["dataset"] == "toybox":
 			network = simclr_net.SimClRNet(numClasses = 12).cuda()
 		else:
 			network = simclr_net.SimClRNet(numClasses = 10).cuda()
