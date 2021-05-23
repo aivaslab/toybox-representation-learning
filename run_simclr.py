@@ -30,7 +30,8 @@ default_args = {'batch_size': exp_args['batch_size'], 'epochs1': exp_args['epoch
 				'lr_ft': exp_args['lr_fts'][0],
 				'save': True, 'frac1': 1.0, 'frac2': 0.1, 'freeze_backbone': True, 'hypertune': True,
 				'saveName': exp_args['tempName'], 'saveRate': -1, 'transform' : 1, 'temperature': 0.1, 'weight_decay': 1e-6,
-				'epochsRan': -1, 'supervisedRep': 1, 'dataset' : exp_args['dataset'], 'distortArg': False, 'workers': 4}
+				'epochsRan': -1, 'supervisedRep': 1, 'dataset' : exp_args['dataset'], 'distortArg': False, 'workers': 4,
+				'sessionSplit': False}
 
 simclr.train_unsupervised_and_supervised(args = default_args)
 
