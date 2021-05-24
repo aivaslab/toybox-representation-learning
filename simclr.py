@@ -33,29 +33,27 @@ def get_train_transform(tr):
 										transforms.ToTensor(),
 										transforms.Normalize(mean, std)])
 	elif tr == 2:
-		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomResizedCrop(size = 224,
-																							  scale = (0.75, 1.0)),
+		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
 										transforms.RandomHorizontalFlip(p = 0.5),
 										transforms.RandomApply([color_jitter], p = 0.8),
-										transforms.RandomGrayscale(p = 0.2),
 										# GaussianBlur(kernel_size = 22),
 										transforms.ToTensor(),
 										transforms.Normalize(mean, std)])
 	elif tr == 3:
 		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
 										transforms.RandomHorizontalFlip(p = 0.5),
-										transforms.RandomApply([color_jitter], p = 0.8),
 										transforms.ToTensor(),
 										transforms.Normalize(mean, std)])
 
 	elif tr == 4:
-		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
+		transform = transforms.Compose([transforms.ToPILImage(),
 										transforms.RandomHorizontalFlip(p = 0.5),
 										transforms.ToTensor(),
 										transforms.Normalize(mean, std)])
 	elif tr == 5:
 		transform = transforms.Compose([transforms.ToPILImage(),
 										transforms.RandomHorizontalFlip(p = 0.5),
+										transforms.RandomApply([color_jitter], p = 0.8),
 										transforms.ToTensor(),
 										transforms.Normalize(mean, std)])
 	else:
