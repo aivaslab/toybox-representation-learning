@@ -370,6 +370,7 @@ def evaluate_trained_network(args):
 			args["saveName"] = outputDirectory + args["resumeFile"]
 	saveName = args["saveName"]
 	accuracies = []
+	args["seed"] = -1
 	for i in range(args["supervisedRep"]):
 		print("------------------------------------------------------------------------------------------------")
 		print("Repetition " + str(i + 1) + " of " + str(args["supervisedRep"]))
