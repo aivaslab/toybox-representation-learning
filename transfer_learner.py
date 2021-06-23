@@ -29,6 +29,7 @@ def get_parser(desc):
 	parser.add_argument('--fraction', '-f', default = 0.1, type = float)
 	parser.add_argument('--dataset', '-data', default = "cifar10", type = str)
 	parser.add_argument('--combined', '-c', default = False, action = "store_true")
+	parser.add_argument('--batch-size', '-b', default = 128, type = int)
 
 	return parser.parse_args()
 
@@ -63,7 +64,7 @@ if __name__ == "__main__":
 		trainData = cifar10_frac.fCIFAR100(root = "./data", train = True, transform = trainTransform, download = True, frac =
 									args['fraction'])
 
-	trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size = 128, shuffle = True,
+	trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size = args['batch_size'], shuffle = True,
 													  num_workers = 4)
 	if args['dataset'] == "cifar10":
 		face_data_test = cifar10_frac.fCIFAR10(root = "./data", train = False, download = True,
@@ -72,7 +73,7 @@ if __name__ == "__main__":
 		face_data_test = cifar10_frac.fCIFAR100(root = "./data", train = False, download = True,
 											   transform = trainTransform)
 
-	testDataLoader = torch.utils.data.DataLoader(face_data_test, batch_size = 128, shuffle = True,
+	testDataLoader = torch.utils.data.DataLoader(face_data_test, batch_size = args['batch_size'], shuffle = True,
 													  num_workers = 4)
 	optimizer = torch.optim.SGD(face_classifier.parameters(), lr = args['lr'], weight_decay = 1e-6, momentum = 0.9)
 	# optimizer.add_param_group({'params': network.backbone.parameters()})
