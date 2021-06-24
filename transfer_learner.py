@@ -55,8 +55,13 @@ if __name__ == "__main__":
 		face_classifier = nn.Sequential(nn.Linear(featSize, featSize // 2), nn.ReLU(),
 										nn.Linear(featSize // 2, 100)).cuda()
 
-	trainTransform = transforms.Compose([transforms.ToPILImage(), transforms.Resize(224), transforms.ToTensor(),
+	trainTransform = transforms.Compose([transforms.ToPILImage(),
+										 transforms.Resize(224),
+										 transforms.RandomHorizontalFlip(p = 0.5),
+										 transforms.RandomCrop(size = 224, padding = 5),
+										 transforms.ToTensor(),
 										 transforms.Normalize(mean, std)])
+
 	if args['dataset'] == "cifar10":
 		trainData = cifar10_frac.fCIFAR10(root = "./data", train = True, transform = trainTransform, download = True, frac =
 									args['fraction'])
