@@ -17,8 +17,10 @@ import tqdm
 import comb_network
 import cifar10_frac
 
-mean = (0.5, 0.5, 0.5)
-std = (0.5, 0.5, 0.5)
+cifar10_mean = (0.4920, 0.4827, 0.4468)
+cifar10_std = (0.2471, 0.2435, 0.2617)
+cifar100_mean = (0.5053, 0.4863, 0.4415)
+cifar100_std = (0.2674, 0.2563, 0.2763)
 
 
 def get_parser(desc):
@@ -26,18 +28,28 @@ def get_parser(desc):
 	parser.add_argument('--model', '-m', required = True, type = str)
 	parser.add_argument('--lr', '-lr', required = True, type = float)
 	parser.add_argument('--epochs', '-e', required = True, type = int)
-	parser.add_argument('--fraction', '-f', default = 0.1, type = float)
+	parser.add_argument('--fraction', '-f', default = 1.0, type = float)
 	parser.add_argument('--dataset', '-data', default = "cifar10", type = str)
 	parser.add_argument('--combined', '-c', default = False, action = "store_true")
 	parser.add_argument('--batch-size', '-b', default = 128, type = int)
+	parser.add_argument('--num-reps', '-n', default = 3, type = int)
+	parser.add_argument('--hypertune', '-ht', default = False, action = 'store_true')
 
 	return parser.parse_args()
 
 
-if __name__ == "__main__":
+def set_seed(sd):
+	if sd == -1:
+		sd = np.random.randint(0, 65536)
+	print("Setting seed to", sd)
+	torch.manual_seed(sd)
+	torch.backends.cudnn.benchmark = False
+	torch.backends.cudnn.deterministic = True
+	rng = np.random.default_rng(sd)
+	return rng
 
-	# network = simclr_net.SimClRNet(numClasses = 12).cuda()
-	args = vars(get_parser("Face Learner"))
+
+def run_transfer_learner(args):
 	if args['combined'] is True:
 		network = comb_network.SimClRNet(numClasses = 12).cuda()
 	else:
@@ -49,38 +61,56 @@ if __name__ == "__main__":
 	network.freeze_all_params()
 	network.eval()
 	featSize = network.classifier_fc.in_features
+
 	if args['dataset'] == "cifar10":
-		face_classifier = nn.Sequential(nn.Linear(featSize, featSize//2), nn.ReLU(), nn.Linear(featSize//2, 10)).cuda()
+		trnsfr_classifier = nn.Sequential(nn.Linear(featSize, featSize//2), nn.ReLU(), nn.Linear(featSize//2, 10)).cuda()
+		trainTransform = transforms.Compose([transforms.ToPILImage(),
+											 transforms.Resize(224),
+											 transforms.RandomHorizontalFlip(p = 0.5),
+											 transforms.RandomCrop(size = 224, padding = 5),
+											 transforms.ToTensor(),
+											 transforms.Normalize(cifar10_mean, cifar10_std)])
+		testTransform = transforms.Compose([transforms.ToPILImage(),
+											transforms.Resize(256),
+											transforms.CenterCrop(224),
+											transforms.ToTensor(),
+											transforms.Normalize(cifar10_mean, cifar10_std)
+											])
+
+		trainData = cifar10_frac.fCIFAR10(root = "./data", train = True, transform = trainTransform, download = True,
+										  frac = args['fraction'], hypertune = args['hypertune'], rng = args['rng'])
+		data_test = cifar10_frac.fCIFAR10(root = "./data", train = False, download = True,
+										  transform = testTransform, hypertune = args['hypertune'], rng = args['rng'])
 	else:
-		face_classifier = nn.Sequential(nn.Linear(featSize, featSize // 2), nn.ReLU(),
+		trnsfr_classifier = nn.Sequential(nn.Linear(featSize, featSize // 2), nn.ReLU(),
 										nn.Linear(featSize // 2, 100)).cuda()
+		trainTransform = transforms.Compose([transforms.ToPILImage(),
+											 transforms.Resize(224),
+											 transforms.RandomHorizontalFlip(p = 0.5),
+											 transforms.RandomCrop(size = 224, padding = 5),
+											 transforms.ToTensor(),
+											 transforms.Normalize(cifar100_mean, cifar100_std)])
 
-	trainTransform = transforms.Compose([transforms.ToPILImage(),
-										 transforms.Resize(224),
-										 transforms.RandomHorizontalFlip(p = 0.5),
-										 transforms.RandomCrop(size = 224, padding = 5),
-										 transforms.ToTensor(),
-										 transforms.Normalize(mean, std)])
+		testTransform = transforms.Compose([transforms.ToPILImage(),
+											transforms.Resize(256),
+											transforms.CenterCrop(224),
+											transforms.ToTensor(),
+											transforms.Normalize(cifar100_mean, cifar100_std)
+											])
+		trainData = cifar10_frac.fCIFAR100(root = "./data", train = True, transform = trainTransform, download = True,
+										   frac = args['fraction'], hypertune = args['hypertune'], rng = args['rng'])
+		data_test = cifar10_frac.fCIFAR100(root = "./data", train = False, download = True,
+										   transform = testTransform, hypertune = args['hypertune'], rng = args['rng'])
 
-	if args['dataset'] == "cifar10":
-		trainData = cifar10_frac.fCIFAR10(root = "./data", train = True, transform = trainTransform, download = True, frac =
-									args['fraction'])
-	else:
-		trainData = cifar10_frac.fCIFAR100(root = "./data", train = True, transform = trainTransform, download = True, frac =
-									args['fraction'])
-
+	trnsfr_classifier.apply(utils.init_weights)
+	print("Train data size:", len(trainData))
+	print("Test data size:", len(data_test))
 	trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size = args['batch_size'], shuffle = True,
-													  num_workers = 4)
-	if args['dataset'] == "cifar10":
-		face_data_test = cifar10_frac.fCIFAR10(root = "./data", train = False, download = True,
-									  transform = trainTransform)
-	else:
-		face_data_test = cifar10_frac.fCIFAR100(root = "./data", train = False, download = True,
-											   transform = trainTransform)
+												  num_workers = 4)
 
-	testDataLoader = torch.utils.data.DataLoader(face_data_test, batch_size = args['batch_size'], shuffle = True,
+	testDataLoader = torch.utils.data.DataLoader(data_test, batch_size = args['batch_size'], shuffle = True,
 													  num_workers = 4)
-	optimizer = torch.optim.SGD(face_classifier.parameters(), lr = args['lr'], weight_decay = 1e-6, momentum = 0.9)
+	optimizer = torch.optim.SGD(trnsfr_classifier.parameters(), lr = args['lr'], weight_decay = 1e-6, momentum = 0.9)
 	# optimizer.add_param_group({'params': network.backbone.parameters()})
 
 	numEpochs = args['epochs']
@@ -88,13 +118,13 @@ if __name__ == "__main__":
 		avg_loss = 0
 		b = 0
 		tqdmBar = tqdm.tqdm(trainDataLoader)
-		for idx, (images, targets) in enumerate(tqdmBar):
+		for idx, (_, images, targets) in enumerate(tqdmBar):
 			optimizer.zero_grad()
 			b += 1
 			images = images.cuda()
 			targets = targets.to(torch.device('cuda:0'))
 			feats = network.backbone(images)
-			logits = face_classifier(feats)
+			logits = trnsfr_classifier(feats)
 			loss = nn.CrossEntropyLoss()(logits, targets)
 			avg_loss = (avg_loss * (b - 1) + loss.item()) / b
 			loss.backward()
@@ -105,10 +135,10 @@ if __name__ == "__main__":
 			optimizer.param_groups[0]['lr'] *= 0.7
 			top1acc = 0
 			totTrainPoints = 0
-			for idx, (images, labels) in enumerate(trainDataLoader):
+			for idx, (_, images, labels) in enumerate(trainDataLoader):
 				with torch.no_grad():
 					feats = network.backbone(images.cuda())
-					logits = face_classifier(feats)
+					logits = trnsfr_classifier(feats)
 				top, pred = utils.calc_accuracy(logits, labels.cuda(), topk = (1,))
 				top1acc += top[0].item() * pred.shape[0]
 				totTrainPoints += pred.shape[0]
@@ -119,10 +149,10 @@ if __name__ == "__main__":
 			top1acc = 0
 			top2acc = 0
 			totTestPoints = 0
-			for _, (images, labels) in enumerate(testDataLoader):
+			for _, (_, images, labels) in enumerate(testDataLoader):
 				with torch.no_grad():
 					feats = network.backbone(images.cuda())
-					logits = face_classifier(feats)
+					logits = trnsfr_classifier(feats)
 				top, pred = utils.calc_accuracy(logits, labels.cuda(), topk = (1, 5))
 				top1acc += top[0].item() * pred.shape[0]
 				top2acc += top[1].item() * pred.shape[0]
@@ -132,34 +162,56 @@ if __name__ == "__main__":
 
 			print("Test Accuracies 1 and 5:", top1acc, top2acc)
 
-	top1acc = 0
+	top1acc_train = 0
 	totTrainPoints = 0
-	for idx, (images, labels) in enumerate(trainDataLoader):
+	for idx, (_, images, labels) in enumerate(trainDataLoader):
 		with torch.no_grad():
 			feats = network.backbone(images.cuda())
-			logits = face_classifier(feats)
+			logits = trnsfr_classifier(feats)
 		top, pred = utils.calc_accuracy(logits, labels.cuda(), topk = (1,))
-		top1acc += top[0].item() * pred.shape[0]
+		top1acc_train += top[0].item() * pred.shape[0]
 		totTrainPoints += pred.shape[0]
-	top1acc /= totTrainPoints
+	top1acc_train /= totTrainPoints
 
-	print("Train Accuracies 1:", top1acc)
+	print("Train Accuracies 1:", top1acc_train)
 
-	top1acc = 0
+	top1acc_test = 0
 	top2acc = 0
 	totTestPoints = 0
-	for _, (images, labels) in enumerate(testDataLoader):
+	for _, (_, images, labels) in enumerate(testDataLoader):
 		with torch.no_grad():
 			feats = network.backbone(images.cuda())
-			logits = face_classifier(feats)
+			logits = trnsfr_classifier(feats)
 		top, pred = utils.calc_accuracy(logits, labels.cuda(), topk = (1, 5))
-		top1acc += top[0].item() * pred.shape[0]
+		top1acc_test += top[0].item() * pred.shape[0]
 		top2acc += top[1].item() * pred.shape[0]
 		totTestPoints += pred.shape[0]
-	top1acc /= totTestPoints
+	top1acc_test /= totTestPoints
 	top2acc /= totTestPoints
 
-	print("Test Accuracies 1 and 5:", top1acc, top2acc)
+	print("Test Accuracies 1 and 5:", top1acc_test, top2acc)
+
+	return top1acc_train, top1acc_test
 
 
+def run_transfer_learner_reps(exp_args):
+	train_accs = []
+	test_accs = []
+	for i in range(exp_args["num_reps"]):
+		print("----------------------------------------------------------------------------------------")
+		print("Starting run", i + 1, "of", exp_args["num_reps"])
+		exp_args["rng"] = set_seed(sd = -1)
+		train_acc, test_acc = run_transfer_learner(args = exp_args)
+		train_accs.append(train_acc)
+		test_accs.append(test_acc)
+		print("----------------------------------------------------------------------------------------")
+	print("Aggregate after running", exp_args['num_reps'], "repetitions:")
+	print("Train accuracy:", train_accs, "mean:", np.mean(np.asarray(train_accs)), "std:", np.std(np.asarray(train_accs)))
+	print("Test accuracy:", test_accs, "mean:", np.mean(np.asarray(test_accs)), "std:", np.std(np.asarray(test_accs)))
+	return train_accs, test_accs
+
+
+if __name__ == "__main__":
+	trsfr_args = vars(get_parser("Face Learner"))
+	run_transfer_learner_reps(exp_args = trsfr_args)
 
