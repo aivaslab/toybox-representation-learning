@@ -1,7 +1,10 @@
-from torchvision.datasets import CIFAR10, CIFAR100
+from torchvision.datasets import CIFAR10, CIFAR100, Caltech101
 import torchvision.transforms as transforms
 import torch
 import numpy as np
+import pickle
+import csv
+import cv2
 
 
 class fCIFAR10(CIFAR10):
@@ -107,6 +110,59 @@ class fCIFAR100(CIFAR100):
 		return item, img, target
 
 
+class fCORe50(torch.utils.data.Dataset):
+
+	def __init__(self, train, transform, rng, hypertune = True, frac = 1.0):
+
+		if hypertune:
+			super(fCORe50, self).__init__()
+		else:
+			super(fCORe50, self).__init__()
+		self.train = train
+		self.transform = transform
+		self.frac = frac
+		self.hypertune = hypertune
+		self.rng = rng
+
+		if not hypertune:
+			self.trainImagesFile = "./data/core50_data_train_object.pickle"
+			self.trainLabelsFile = "./data/core50_data_train_object.csv"
+			self.testImagesFile = "./data/core50_data_test_object.pickle"
+			self.testLabelsFile = "./data/core50_data_test_object.csv"
+		else:
+			self.trainImagesFile = "./data/core50_data_dev_object.pickle"
+			self.trainLabelsFile = "./data/core50_data_dev_object.csv"
+			self.testImagesFile = "./data/core50_data_val_object.pickle"
+			self.testLabelsFile = "./data/core50_data_val_object.csv"
+
+		if self.train:
+			with open(self.trainImagesFile, "rb") as pickleFile:
+				self.data = pickle.load(pickleFile)
+			with open(self.trainLabelsFile, "r") as csvFile:
+				self.labels = list(csv.DictReader(csvFile))
+		else:
+			with open(self.testImagesFile, "rb") as pickleFile:
+				self.data = pickle.load(pickleFile)
+			with open(self.testLabelsFile, "r") as csvFile:
+				self.labels = list(csv.DictReader(csvFile))
+
+		len_data = len(self.data)
+		self.indices = rng.choice(len_data, size = int(frac * len_data))
+
+	def __len__(self):
+		if self.train:
+			return len(self.indices)
+		else:
+			return len(self.indices)
+
+	def __getitem__(self, idx):
+		item = self.indices[idx]
+		img = np.array(cv2.imdecode(self.data[item], 3))
+		target = int(self.labels[item]['Class ID'])
+		img = self.transform(img)
+		return item, img, target
+
+
 def online_mean_and_sd(loader):
 	"""Compute the mean and sd in an online fashion
 
@@ -135,8 +191,9 @@ if __name__ == "__main__":
 									# transforms.Resize(224),
 									transforms.ToTensor(),
 									])
-	dataset = fCIFAR10(root = "./data/", train = True, download = True, transform = transform, hypertune = False,
-					   frac = 1.0)
+	dataset = fCORe50(train = True, transform = transform, hypertune = False,
+					   frac = 1.0, rng = np.random.default_rng(0))
+	print(len(dataset))
 	loader = torch.utils.data.DataLoader(dataset, batch_size = 64, shuffle = True, num_workers = 4)
-	# m, sd = online_mean_and_sd(loader = loader)
-	# print(m, sd)
+	m, sd = online_mean_and_sd(loader = loader)
+	print(m, sd)
