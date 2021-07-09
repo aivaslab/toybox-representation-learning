@@ -31,8 +31,16 @@ class fCIFAR10(CIFAR10):
 			range_low = 0
 			range_high = len(self.data)
 
-		indices = self.rng.integers(low = range_low, high = range_high, size = int(frac * (range_high - range_low)),
-									dtype = np.int32)
+		arr = np.arange(range_low, range_high)
+		print("Split:", self.train, np.min(arr), np.max(arr))
+		len_data = range_high - range_low
+
+		indices = self.rng.choice(arr,  size = int(frac * len_data), replace = False)
+
+		unique = len(indices) == len(set(indices))
+		assert unique
+		assert len(indices) == int(frac * len_data)
+
 		if self.train:
 			self.train_data = self.data[indices]
 			self.train_labels = np.array(self.targets)[indices]
@@ -83,8 +91,16 @@ class fCIFAR100(CIFAR100):
 			range_low = 0
 			range_high = len(self.data)
 
-		indices = rng.integers(low = range_low, high = range_high, size = int(frac * (range_high - range_low)),
-									dtype = np.int32)
+		arr = np.arange(range_low, range_high)
+		print("Split:", self.train, np.min(arr), np.max(arr))
+		len_data = range_high - range_low
+
+		indices = self.rng.choice(arr,  size = int(frac * len_data), replace = False)
+
+		unique = len(indices) == len(set(indices))
+		assert unique
+		assert len(indices) == int(frac * len_data)
+
 		if self.train:
 			self.train_data = self.data[indices]
 			self.train_labels = np.array(self.targets)[indices]
@@ -147,7 +163,7 @@ class fCORe50(torch.utils.data.Dataset):
 				self.labels = list(csv.DictReader(csvFile))
 
 		len_data = len(self.data)
-		self.indices = rng.choice(len_data, size = int(frac * len_data))
+		self.indices = rng.choice(len_data, size = int(frac * len_data), replace = False)
 
 	def __len__(self):
 		if self.train:
