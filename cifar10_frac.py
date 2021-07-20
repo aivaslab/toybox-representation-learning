@@ -179,6 +179,59 @@ class fCORe50(torch.utils.data.Dataset):
 		return item, img, target
 
 
+class fALOI(torch.utils.data.Dataset):
+
+	def __init__(self, train, transform, rng, hypertune = True, frac = 1.0):
+
+		if hypertune:
+			super(fALOI, self).__init__()
+		else:
+			super(fALOI, self).__init__()
+		self.train = train
+		self.transform = transform
+		self.frac = frac
+		self.hypertune = hypertune
+		self.rng = rng
+
+		if not hypertune:
+			self.trainImagesFile = "./data/aloi_train.pickle"
+			self.trainLabelsFile = "./data/aloi_train.csv"
+			self.testImagesFile = "./data/aloi_test.pickle"
+			self.testLabelsFile = "./data/aloi_test.csv"
+		else:
+			self.trainImagesFile = "./data/aloi_dev.pickle"
+			self.trainLabelsFile = "./data/aloi_dev.csv"
+			self.testImagesFile = "./data/aloi_val.pickle"
+			self.testLabelsFile = "./data/aloi_val.csv"
+
+		if self.train:
+			with open(self.trainImagesFile, "rb") as pickleFile:
+				self.data = pickle.load(pickleFile)
+			with open(self.trainLabelsFile, "r") as csvFile:
+				self.labels = list(csv.DictReader(csvFile))
+		else:
+			with open(self.testImagesFile, "rb") as pickleFile:
+				self.data = pickle.load(pickleFile)
+			with open(self.testLabelsFile, "r") as csvFile:
+				self.labels = list(csv.DictReader(csvFile))
+		assert(len(self.data) == len(self.labels))
+		len_data = len(self.data)
+		self.indices = rng.choice(len_data, size = int(frac * len_data), replace = False)
+
+	def __len__(self):
+		if self.train:
+			return len(self.indices)
+		else:
+			return len(self.indices)
+
+	def __getitem__(self, idx):
+		item = self.indices[idx]
+		img = np.array(cv2.imdecode(self.data[item], 3))
+		target = int(self.labels[item]['Object ID']) - 1
+		img = self.transform(img)
+		return item, img, target
+
+
 def online_mean_and_sd(loader):
 	"""Compute the mean and sd in an online fashion
 
@@ -207,9 +260,11 @@ if __name__ == "__main__":
 									# transforms.Resize(224),
 									transforms.ToTensor(),
 									])
-	dataset = fCORe50(train = True, transform = transform, hypertune = False,
+	dataset = fALOI(train = False, transform = transform, hypertune = False,
 					   frac = 1.0, rng = np.random.default_rng(0))
 	print(len(dataset))
 	loader = torch.utils.data.DataLoader(dataset, batch_size = 64, shuffle = True, num_workers = 4)
 	m, sd = online_mean_and_sd(loader = loader)
 	print(m, sd)
+	cv2.imshow("example", cv2.imdecode(dataset[0][1], 3))
+	cv2.waitKey(0)

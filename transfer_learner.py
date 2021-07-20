@@ -23,6 +23,8 @@ cifar100_mean = (0.5053, 0.4863, 0.4415)
 cifar100_std = (0.2674, 0.2563, 0.2763)
 core50_mean = (0.6000, 0.5691, 0.5418)
 core50_std = (0.2137, 0.2211, 0.2352)
+aloi_mean = (0.0638, 0.0988, 0.1158)
+aloi_std = (0.1272, 0.1681, 0.1964)
 
 
 def get_parser(desc):
@@ -103,7 +105,7 @@ def run_transfer_learner(args):
 										   frac = args['fraction'], hypertune = args['hypertune'], rng = args['rng'])
 		data_test = cifar10_frac.fCIFAR100(root = "./data", train = False, download = True,
 										   transform = testTransform, hypertune = args['hypertune'], rng = args['rng'])
-	else:
+	elif args["dataset"] == "core50":
 		trnsfr_classifier = nn.Sequential(nn.Linear(featSize, featSize // 2), nn.ReLU(),
 										  nn.Linear(featSize // 2, 10)).cuda()
 		trainTransform = transforms.Compose([transforms.ToPILImage(),
@@ -122,6 +124,26 @@ def run_transfer_learner(args):
 		trainData = cifar10_frac.fCORe50(train = True, transform = trainTransform, frac = args['fraction'],
 										 hypertune = args['hypertune'], rng = args['rng'])
 		data_test = cifar10_frac.fCORe50(train = False, transform = testTransform, hypertune = args['hypertune'],
+										 rng = args['rng'])
+	else:
+		trnsfr_classifier = nn.Sequential(nn.Linear(featSize, featSize // 2), nn.ReLU(),
+										  nn.Linear(featSize // 2, 1000)).cuda()
+		trainTransform = transforms.Compose([transforms.ToPILImage(),
+											 transforms.Resize(224),
+											 transforms.RandomHorizontalFlip(p = 0.5),
+											 transforms.RandomCrop(size = 224, padding = 5),
+											 transforms.ToTensor(),
+											 transforms.Normalize(aloi_mean, aloi_std)])
+
+		testTransform = transforms.Compose([transforms.ToPILImage(),
+											transforms.Resize(256),
+											transforms.CenterCrop(224),
+											transforms.ToTensor(),
+											transforms.Normalize(aloi_mean, aloi_std)
+											])
+		trainData = cifar10_frac.fALOI(train = True, transform = trainTransform, frac = args['fraction'],
+										 hypertune = args['hypertune'], rng = args['rng'])
+		data_test = cifar10_frac.fALOI(train = False, transform = testTransform, hypertune = args['hypertune'],
 										 rng = args['rng'])
 
 	trnsfr_classifier.apply(utils.init_weights)
