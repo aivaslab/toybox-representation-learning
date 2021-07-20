@@ -14,6 +14,7 @@ def get_parser(desc):
 	parser.add_argument('--combined', '-c', default = False, action = "store_true")
 	parser.add_argument('--batch-size', '-b', default = 128, type = int)
 	parser.add_argument('--num-reps', '-n', default = 3, type = int)
+	parser.add_argument('--num_layers_frozen', '-l', default = 4, type = int)
 
 	return parser.parse_args()
 

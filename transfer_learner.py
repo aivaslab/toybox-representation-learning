@@ -38,6 +38,7 @@ def get_parser(desc):
 	parser.add_argument('--batch-size', '-b', default = 128, type = int)
 	parser.add_argument('--num-reps', '-n', default = 3, type = int)
 	parser.add_argument('--hypertune', '-ht', default = False, action = 'store_true')
+	parser.add_argument('--num_layers_frozen', '-l', default = 4, type = int)
 
 	return parser.parse_args()
 
@@ -62,8 +63,33 @@ def run_transfer_learner(args):
 	fileName = "./pose_models/" + args['model']
 	assert(os.path.isfile(fileName))
 	network.load_state_dict(torch.load(fileName))
-	network.freeze_all_params()
-	network.eval()
+
+	network.unfreeze_all_params()
+	totalParams = sum(p.numel() for p in network.backbone.parameters())
+	trainableParams = sum(p.numel() for p in network.backbone.parameters() if p.requires_grad)
+	print(str(trainableParams) + "/" + str(totalParams) + " parameters of backbone network are trainable.")
+
+	if args['num_layers_frozen'] == 1:
+		network.freeze_backbone_layer_1()
+		totalParams = sum(p.numel() for p in network.backbone.parameters())
+		trainableParams = sum(p.numel() for p in network.backbone.parameters() if p.requires_grad)
+		print(str(trainableParams) + "/" + str(totalParams) + " parameters of backbone network are trainable.")
+	elif args['num_layers_frozen'] == 2:
+		network.freeze_backbone_layer_2()
+		totalParams = sum(p.numel() for p in network.backbone.parameters())
+		trainableParams = sum(p.numel() for p in network.backbone.parameters() if p.requires_grad)
+		print(str(trainableParams) + "/" + str(totalParams) + " parameters of backbone network are trainable.")
+	elif args['num_layers_frozen'] == 3:
+		network.freeze_backbone_layer_3()
+		totalParams = sum(p.numel() for p in network.backbone.parameters())
+		trainableParams = sum(p.numel() for p in network.backbone.parameters() if p.requires_grad)
+		print(str(trainableParams) + "/" + str(totalParams) + " parameters of backbone network are trainable.")
+	elif args['num_layers_frozen'] == 4:
+		network.freeze_all_params()
+		totalParams = sum(p.numel() for p in network.backbone.parameters())
+		trainableParams = sum(p.numel() for p in network.backbone.parameters() if p.requires_grad)
+		print(str(trainableParams) + "/" + str(totalParams) + " parameters of backbone network are trainable.")
+
 	featSize = network.classifier_fc.in_features
 
 	if args['dataset'] == "cifar10":

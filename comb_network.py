@@ -84,6 +84,126 @@ class SimClRNet(nn.Module):
 		self.classifier_fc.train()
 		print("Freezing only unsupervised head fc.")
 
+
+	def freeze_backbone_layer_1(self):
+		for name, param in self.backbone.conv1.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.bn1.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.relu.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.maxpool.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.layer1.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.layer2.named_parameters():
+			param.requires_grad = True
+		for name, param in self.backbone.layer3.named_parameters():
+			param.requires_grad = True
+		for name, param in self.backbone.layer4.named_parameters():
+			param.requires_grad = True
+		for name, param in self.backbone.avgpool.named_parameters():
+			param.requires_grad = True
+		for name, param in self.fc.named_parameters():
+			param.requires_grad = False
+		for name, param in self.fc2.named_parameters():
+			param.requires_grad = False
+		for name, param in self.classifier_fc.named_parameters():
+			param.requires_grad = False
+		self.classifier_fc.eval()
+		self.fc.eval()
+		self.fc2.eval()
+		self.backbone.conv1.eval()
+		self.backbone.bn1.eval()
+		self.backbone.relu.eval()
+		self.backbone.maxpool.eval()
+		self.backbone.layer1.eval()
+		self.backbone.layer2.train(mode = True)
+		self.backbone.layer3.train(mode = True)
+		self.backbone.layer4.train(mode = True)
+		print("Freezing initial conv layer of ResNet and first residual block. Both heads are frozen and remaining residual"
+			  " blocks are unfrozen.")
+
+
+	def freeze_backbone_layer_2(self):
+		for name, param in self.backbone.conv1.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.bn1.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.relu.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.maxpool.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.layer1.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.layer2.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.layer3.named_parameters():
+			param.requires_grad = True
+		for name, param in self.backbone.layer4.named_parameters():
+			param.requires_grad = True
+		for name, param in self.backbone.avgpool.named_parameters():
+			param.requires_grad = True
+		for name, param in self.fc.named_parameters():
+			param.requires_grad = False
+		for name, param in self.fc2.named_parameters():
+			param.requires_grad = False
+		for name, param in self.classifier_fc.named_parameters():
+			param.requires_grad = False
+		self.classifier_fc.eval()
+		self.fc.eval()
+		self.fc2.eval()
+		self.backbone.conv1.eval()
+		self.backbone.bn1.eval()
+		self.backbone.relu.eval()
+		self.backbone.maxpool.eval()
+		self.backbone.layer1.eval()
+		self.backbone.layer2.eval()
+		self.backbone.layer3.train(mode = True)
+		self.backbone.layer4.train(mode = True)
+		print("Freezing initial conv layer of ResNet and first two residual blocks. Both heads are frozen and remaining "
+			  "residual blocks are unfrozen.")
+
+
+	def freeze_backbone_layer_3(self):
+		for name, param in self.backbone.conv1.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.bn1.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.relu.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.maxpool.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.layer1.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.layer2.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.layer3.named_parameters():
+			param.requires_grad = False
+		for name, param in self.backbone.layer4.named_parameters():
+			param.requires_grad = True
+		for name, param in self.backbone.avgpool.named_parameters():
+			param.requires_grad = True
+		for name, param in self.fc.named_parameters():
+			param.requires_grad = False
+		for name, param in self.fc2.named_parameters():
+			param.requires_grad = False
+		for name, param in self.classifier_fc.named_parameters():
+			param.requires_grad = False
+		self.classifier_fc.eval()
+		self.fc.eval()
+		self.fc2.eval()
+		self.backbone.conv1.eval()
+		self.backbone.bn1.eval()
+		self.backbone.relu.eval()
+		self.backbone.maxpool.eval()
+		self.backbone.layer1.eval()
+		self.backbone.layer2.eval()
+		self.backbone.layer3.eval()
+		self.backbone.layer4.train(mode = True)
+		print("Freezing initial conv layer of ResNet and first three residual blocks. Both heads are frozen and remaining "
+			  "residual blocks are unfrozen.")
+
 	def unfreeze_all_params(self):
 		for name, param in self.backbone.named_parameters():
 			param.requires_grad = True
@@ -93,6 +213,7 @@ class SimClRNet(nn.Module):
 			param.requires_grad = True
 		for name, param in self.classifier_fc.named_parameters():
 			param.requires_grad = True
+		print("Unfreezing all params in combined network. All params should be trainable.")
 
 	def freeze_all_params(self):
 		for name, param in self.backbone.named_parameters():
@@ -103,3 +224,4 @@ class SimClRNet(nn.Module):
 			param.requires_grad = False
 		for name, param in self.classifier_fc.named_parameters():
 			param.requires_grad = False
+		print("Freezing all params in SimCLR network. No params should be trainable.")
