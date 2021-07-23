@@ -85,7 +85,7 @@ def run_transfer_learner(args):
 		totalParams = sum(p.numel() for p in network.backbone.parameters())
 		trainableParams = sum(p.numel() for p in network.backbone.parameters() if p.requires_grad)
 		print(str(trainableParams) + "/" + str(totalParams) + " parameters of backbone network are trainable.")
-	elif args['num_layers_frozen'] == 4:
+	elif args['num_layers_frozen'] > 0:
 		network.freeze_all_params()
 		totalParams = sum(p.numel() for p in network.backbone.parameters())
 		trainableParams = sum(p.numel() for p in network.backbone.parameters() if p.requires_grad)
@@ -182,6 +182,20 @@ def run_transfer_learner(args):
 	testDataLoader = torch.utils.data.DataLoader(data_test, batch_size = args['batch_size'], shuffle = True,
 													  num_workers = 4)
 	optimizer = torch.optim.SGD(trnsfr_classifier.parameters(), lr = args['lr'], weight_decay = 1e-6, momentum = 0.9)
+	if args['num_layers_frozen'] <= 3:
+		optimizer.add_param_group({'params': network.backbone.layer4.parameters()})
+		optimizer.add_param_group({'params': network.backbone.avgpool.parameters()})
+	if args['num_layers_frozen'] <= 2:
+		optimizer.add_param_group({'params': network.backbone.layer3.parameters()})
+	if args['num_layers_frozen'] <= 1:
+		optimizer.add_param_group({'params': network.backbone.layer2.parameters()})
+	if args['num_layers_frozen'] <= 0:
+		optimizer.add_param_group({'params': network.backbone.layer1.parameters()})
+		optimizer.add_param_group({'params': network.backbone.maxpool.parameters()})
+		optimizer.add_param_group({'params': network.backbone.relu.parameters()})
+		optimizer.add_param_group({'params': network.backbone.bn1.parameters()})
+		optimizer.add_param_group({'params': network.backbone.conv1.parameters()})
+
 	# optimizer.add_param_group({'params': network.backbone.parameters()})
 
 	numEpochs = args['epochs']
