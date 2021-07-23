@@ -61,9 +61,12 @@ def run_transfer_learner(args):
 	else:
 		network = simclr_net.SimClRNet(numClasses = 12).cuda()
 
-	fileName = "./pose_models/" + args['model']
-	assert(os.path.isfile(fileName))
-	network.load_state_dict(torch.load(fileName))
+	if args['model'] != "random":
+		fileName = "./pose_models/" + args['model']
+		assert(os.path.isfile(fileName))
+		network.load_state_dict(torch.load(fileName))
+	else:
+		print("Random model initialized.")
 
 	network.unfreeze_all_params()
 	totalParams = sum(p.numel() for p in network.backbone.parameters())
