@@ -39,6 +39,7 @@ def get_parser(desc):
 	parser.add_argument('--num-reps', '-n', default = 3, type = int)
 	parser.add_argument('--hypertune', '-ht', default = False, action = 'store_true')
 	parser.add_argument('--num_layers_frozen', '-l', default = 4, type = int)
+	parser.add_argument('--decay_epochs', '-de', default = 20, type = int)
 
 	return parser.parse_args()
 
@@ -201,7 +202,7 @@ def run_transfer_learner(args):
 			optimizer.step()
 			tqdmBar.set_description("Epoch: {:d}/{:d} Loss: {:.4f}, LR: {:.8f}".format(ep + 1, numEpochs, avg_loss,
 																				optimizer.param_groups[0]['lr']))
-		if ep % 10 == 9 and ep > 0:
+		if ep % args['decay_epochs'] == args['decay_epochs'] - 1 and ep > 0:
 			optimizer.param_groups[0]['lr'] *= 0.7
 			top1acc = 0
 			totTrainPoints = 0
