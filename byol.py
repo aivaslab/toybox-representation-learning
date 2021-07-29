@@ -10,7 +10,7 @@ import csv
 import datetime
 
 import network as net
-from dataset import data_simclr
+from dataset_toybox import data_toybox
 import parser
 
 outputDirectory = "./output/"
@@ -125,8 +125,8 @@ def learn_unsupervised(args, network, device):
 	numEpochs = args['epochs1']
 	transform_train = get_train_transform(args["transform"])
 
-	trainData = data_simclr(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
-							transform = transform_train, fraction = 1, distort = args['distort'], adj = args['adj'],
+	trainData = data_toybox(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
+							transform = transform_train, fraction = args['frac1'], distort = args['distort'], adj = args['adj'],
 							hyperTune = args["hypertune"])
 	trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size = args['batch_size'], shuffle = True,
 												  num_workers = 2)
@@ -157,12 +157,12 @@ def learn_unsupervised(args, network, device):
 			# print(images1.shape, images2.shape)
 			features1 = network.encoder_forward(images1)
 			features2 = network.encoder_forward(images2)
-			with torch.no_grad():
-				targets1 = network.target_forward(images2)
-				targets2 = network.target_forward(images1)
 
-			loss = loss_fn(features1, targets1)
-			loss += loss_fn(features2, targets2)
+			targets1 = network.target_forward(images2)
+			targets2 = network.target_forward(images1)
+
+			loss = loss_fn(features1, targets1.detach())
+			loss += loss_fn(features2, targets2.detach())
 			loss = loss.mean()
 			avg_loss = (avg_loss * (b - 1) + loss) / b
 			loss.backward()
@@ -187,11 +187,11 @@ def learn_supervised(args, network, device):
 
 	transform_test = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(),
 										 transforms.Normalize(mean, std)])
-	trainSet = data_simclr(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
-						   fraction = args["frac"], hyperTune = args["hypertune"], rng = args["rng"])
+	trainSet = data_toybox(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
+						   fraction = args["frac2"], hyperTune = args["hypertune"], rng = args["rng"])
 	trainLoader = torch.utils.data.DataLoader(trainSet, batch_size = args['batch_size'], shuffle = True)
 
-	testSet = data_simclr(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
+	testSet = data_toybox(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
 						  hyperTune = args["hypertune"], rng = args["rng"])
 	testLoader = torch.utils.data.DataLoader(testSet, batch_size = args['batch_size'], shuffle = False)
 	pytorch_total_params = sum(p.numel() for p in network.parameters())

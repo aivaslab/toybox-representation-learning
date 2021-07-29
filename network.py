@@ -39,6 +39,36 @@ class SimClRNet(nn.Module):
 			y = self.classifier_fc(y)
 		return y
 
+	def forward_l1(self, x):
+		y = self.backbone.conv1(x)
+		y = self.backbone.layer1(y)
+		return y
+
+
+	def forward_l2(self, x):
+		y = self.backbone.conv1(x)
+		y = self.backbone.layer1(y)
+		y = self.backbone.layer2(y)
+		return y
+
+
+	def forward_l3(self, x):
+		y = self.backbone.conv1(x)
+		y = self.backbone.layer1(y)
+		y = self.backbone.layer2(y)
+		y = self.backbone.layer3(y)
+		return y
+
+
+	def forward_l4(self, x):
+		y = self.backbone.conv1(x)
+		y = self.backbone.layer1(y)
+		y = self.backbone.layer2(y)
+		y = self.backbone.layer3(y)
+		y = self.backbone.layer4(y)
+		return y
+
+
 	def freeze_feat(self):
 		for name, param in self.backbone.named_parameters():
 			param.requires_grad = False

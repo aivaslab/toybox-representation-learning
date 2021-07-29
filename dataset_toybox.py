@@ -74,10 +74,10 @@ class data_toybox(data_simclr):
 				self.testImagesFile = "./data/toybox_data_cropped_val.pickle"
 				self.testLabelsFile = "./data/toybox_data_cropped_val.csv"
 			else:
-				self.trainImagesFile = "./data/toybox_data_interpolate_cropped_dev.pickle"
-				self.trainLabelsFile = "./data/toybox_data_interpolate_cropped_dev.csv"
-				self.testImagesFile = "./data/toybox_data_interpolate_cropped_val.pickle"
-				self.testLabelsFile = "./data/toybox_data_interpolate_cropped_val.csv"
+				self.trainImagesFile = "./data2/toybox_data_interpolated_cropped_dev.pickle"
+				self.trainLabelsFile = "./data2/toybox_data_interpolated_cropped_dev.csv"
+				self.testImagesFile = "./data2/toybox_data_interpolated_cropped_val.pickle"
+				self.testLabelsFile = "./data2/toybox_data_interpolated_cropped_val.csv"
 
 		super().__init__(root = root, rng = rng, train = train, transform = transform, nViews = nViews, size = size,
 						 split = split, fraction = fraction, distort = distort, adj = adj, hyperTune = hyperTune,
@@ -139,16 +139,70 @@ def online_mean_and_sd(loader):
 	return fst_moment, torch.sqrt(snd_moment - fst_moment ** 2)
 
 
+def get_images():
+	s = 1
+	color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
+	transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
+									transforms.RandomApply([color_jitter], p = 0.8),
+									transforms.RandomGrayscale(p = 0.2)])
+
+	csvFile = open("./data2/toybox_data_interpolated_cropped_test.csv", "r")
+	csvReader = list(csv.DictReader(csvFile))
+	framesList = []
+	for i in range(len(csvReader)):
+		row = csvReader[i]
+		if 'helicopter_10_pivothead_rxminus' in row['File Name']:
+			framesList.append(i)
+	with open("./data2/toybox_data_interpolated_cropped_test.pickle", "rb") as pickleFile:
+		images = pickle.load(pickleFile)
+	for i in range(len(framesList)):
+		cv2.imwrite("../neurips images/" + "image_new_" + str(i) + ".png", cv2.imdecode(images[framesList[i]], 3))
+		cv2.waitKey(0)
+		img = transform(cv2.imdecode(images[framesList[i]], 3))
+		img.save("../neurips images/" + "image_new_tr_" + str(i) + ".png")
+	print(len(framesList))
+
+
 if __name__ == "__main__":
-	rng = np.random.default_rng(5)
-	simclr = data_toybox(root = "./data", rng = rng, train = True, nViews = 2, size = 224,
-								transform = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]), fraction = 0.1,
-						 distort = "self", adj = -1, hyperTune = True, frac_by_object = True)
-	trainDataLoader = torch.utils.data.DataLoader(simclr, batch_size = 64, shuffle = True,
-													  num_workers = 2)
+	seed = 7
+	rng = np.random.default_rng(seed)
+	s = 1
+	color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
+	transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
+									transforms.RandomApply([color_jitter], p = 0.8),
+									transforms.RandomGrayscale(p = 0.2), transforms.ToTensor()])
+	transform = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()])
 
-	print(len(simclr))
+	csvFile = open("./data/toybox_data_cropped_train.csv", "r")
+	csvReader = list(csv.DictReader(csvFile))
+	framesList = []
+	k = rng.integers(low = 0, high = 25000, size=1)[0]
+	row = csvReader[k]
+	print(row["Obj Start"], row['Obj End'], row['Tr Start'], row['Tr End'], row['CL Start'], row['CL End'])
+	obj_start = row['Obj Start']
+	obj_end = row['Obj End']
+	tr_start = row['Tr Start']
+	tr_end = row['Tr End']
+	cl_start = row['CL Start']
+	cl_end = row['CL End']
 
+	with open("./data/toybox_data_cropped_train.pickle", "rb") as pickleFile:
+		images = pickle.load(pickleFile)
+	# print(len(simclr))
+	original = cv2.imdecode(images[k], 3)
+	cv2.imwrite("orig_orig.png", original)
+
+	tr = rng.integers(low = tr_start, high = tr_end, size = 1)[0]
+	tra = cv2.imdecode(images[tr], 3)
+	cv2.imwrite("orig_transform.png", tra)
+
+	ob = rng.integers(low = obj_start, high = obj_end, size = 1)[0]
+	objImg = cv2.imdecode(images[ob], 3)
+	cv2.imwrite("orig_obj.png", objImg)
+
+	clidx = rng.integers(low = cl_start, high = cl_end, size = 1)[0]
+	clImg = cv2.imdecode(images[clidx], 3)
+	cv2.imwrite("orig_cl.png", clImg)
 
 	# mean, std = online_mean_and_sd(trainDataLoader)
 	# print(mean, std)

@@ -80,13 +80,13 @@ class data_simclr(torch.utils.data.Dataset):
 							objectsInTrain.append(i)
 					else:
 						objectsInTrain.append(i)
-			print(cl, objectsInTrain)
+			# print(cl, objectsInTrain)
 			objectsSel = self.rng.choice(objectsInTrain, numObjectsPerClassSelected)
 			for obj in objectsSel:
 				assert(obj not in TEST_NO[classes[cl]])
 				if self.hyperTune:
 					assert(obj not in VAL_NO[classes[cl]])
-			print(objectsSel)
+			# print(objectsSel)
 			objectsSelected[cl] = objectsSel
 		self.objectsSelected = objectsSelected
 		indicesSelected = []
@@ -174,6 +174,7 @@ class data_simclr(torch.utils.data.Dataset):
 				imgs = self.transform(img)
 			else:
 				imgs = img
+
 		return actualIndex, imgs, int(label)
 
 
