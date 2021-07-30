@@ -169,9 +169,10 @@ def learn_unsupervised(args, network, device):
 			optimizer.step()
 			with torch.no_grad():
 				network.update_target_network()
-			tqdmBar.set_description("Epoch: {:d}/{:d}, Loss: {:.6f}, LR: {:.8f}".format(ep + 1, numEpochs, avg_loss,
+			tqdmBar.set_description("Epoch: {:d}/{:d}, Loss: {:.6f}, LR: {:.8f}, b: {:.4f}".format(ep + 1, numEpochs, avg_loss,
 																						optimizer.param_groups[0][
-																							'lr']))
+																							'lr'], network.beta))
+		network.update_momentum(ep + 1, numEpochs)
 		if ep > 8:
 			scheduler.step()
 		if args["saveRate"] != -1 and (ep + 1) % args["saveRate"] == 0 and args["save"]:
@@ -217,7 +218,8 @@ def learn_supervised(args, network, device):
 			loss = nn.CrossEntropyLoss()(logits, labels)
 			tot_loss += loss.item()
 			ep_id += 1
-			tqdmBar.set_description("Epoch: {:d}/{:d} Loss: {:.4f}".format(ep + 1, numEpochsS, tot_loss / ep_id))
+			tqdmBar.set_description("Epoch: {:d}/{:d} Loss: {:.4f} LR: {:.8f}".format(ep + 1, numEpochsS, tot_loss / ep_id,
+																					  optimizer.param_groups[0]['lr']))
 			loss.backward()
 			optimizer.step()
 		if ep % 5 == 0:

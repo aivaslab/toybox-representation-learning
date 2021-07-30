@@ -1,6 +1,7 @@
 import torchvision.models as models
 import torch.nn as nn
 import copy
+import numpy as np
 
 
 def init_weights(m):
@@ -242,20 +243,21 @@ class SimClRNet(nn.Module):
 
 class BYOLNet(nn.Module):
 
-	def __init__(self, numClasses, beta = 0.999):
+	def __init__(self, numClasses, beta = 0.996):
 		super().__init__()
 		self.numClasses = numClasses
 		self.encoder_backbone = models.resnet18(pretrained = False, num_classes = 256)
 		self.num_features = self.encoder_backbone.fc.in_features
-		self.beta = beta
+		self.start_beta = beta
+		self.beta = self.start_beta
 		feat_num = self.num_features
 		self.encoder_backbone.fc = nn.Identity()
 		self.encoder_projection = nn.Sequential(nn.Linear(in_features = feat_num, out_features = 2*feat_num),
 												nn.BatchNorm1d(num_features = 2*feat_num), nn.ReLU(inplace = True),
 												nn.Linear(in_features = 2*feat_num, out_features = 128))
-		self.encoder_prediction = nn.Sequential(nn.Linear(in_features = 128, out_features = feat_num),
-												nn.BatchNorm1d(num_features = feat_num), nn.ReLU(inplace = True),
-												nn.Linear(in_features = feat_num, out_features = 128))
+		self.encoder_prediction = nn.Sequential(nn.Linear(in_features = 128, out_features = 2*feat_num),
+												nn.BatchNorm1d(num_features = 2*feat_num), nn.ReLU(inplace = True),
+												nn.Linear(in_features = 2*feat_num, out_features = 128))
 
 		self.classifier_fc = nn.Linear(feat_num, numClasses)
 		self.encoder_backbone.apply(init_weights)
@@ -264,6 +266,9 @@ class BYOLNet(nn.Module):
 		self.classifier_fc.apply(init_weights)
 		self.target_backbone = copy.deepcopy(self.encoder_backbone)
 		self.target_projection = copy.deepcopy(self.encoder_projection)
+
+	def update_momentum(self, epochs, total_epochs):
+		self.beta = 1 - (1 - self.start_beta) * (np.cos(np.pi * epochs / total_epochs) + 1) / 2.0
 
 	def update_target_network(self):
 		for current_params, ma_params in zip(self.encoder_backbone.parameters(), self.target_backbone.parameters()):
@@ -297,71 +302,71 @@ class BYOLNet(nn.Module):
 	def freeze_encoder_backbone(self):
 		for name, param in self.encoder_backbone.named_parameters():
 			param.requires_grad = False
-		# self.encoder_backbone.eval()
+		self.encoder_backbone.eval()
 		print("Freezing encoder network backbone.....")
 
 	def unfreeze_encoder_backbone(self):
 		for name, param in self.encoder_backbone.named_parameters():
 			param.requires_grad = True
-		# self.encoder_backbone.train()
+		self.encoder_backbone.train()
 		print("Unfreezing encoder network backbone.....")
 
 	def freeze_encoder_projection(self):
 		for name, param in self.encoder_projection.named_parameters():
 			param.requires_grad = False
-		# self.encoder_projection.eval()
+		self.encoder_projection.eval()
 		print("Freezing encoder network projection.....")
 
 	def unfreeze_encoder_projection(self):
 		for name, param in self.encoder_projection.named_parameters():
 			param.requires_grad = True
-		# self.encoder_projection.train()
+		self.encoder_projection.train()
 		print("Unfreezing encoder network projection.....")
 
 	def freeze_encoder_prediction(self):
 		for name, param in self.encoder_prediction.named_parameters():
 			param.requires_grad = False
-		# self.encoder_prediction.eval()
+		self.encoder_prediction.eval()
 		print("Freezing encoder network prediction.....")
 
 	def unfreeze_encoder_prediction(self):
 		for name, param in self.encoder_prediction.named_parameters():
 			param.requires_grad = True
-		# self.encoder_prediction.train()
+		self.encoder_prediction.train()
 		print("Unfreezing encoder network prediction.....")
 
 	def freeze_target_backbone(self):
 		for name, param in self.target_backbone.named_parameters():
 			param.requires_grad = False
-		# self.target_backbone.eval()
+		self.target_backbone.eval()
 		print("Freezing target network backbone.....")
 
 	def unfreeze_target_backbone(self):
 		for name, param in self.target_backbone.named_parameters():
 			param.requires_grad = True
-		# self.target_backbone.train()
+		self.target_backbone.train()
 		print("Unfreezing target network backbone.....")
 
 	def freeze_target_projection(self):
 		for name, param in self.target_projection.named_parameters():
 			param.requires_grad = False
-		# self.target_projection.eval()
+		self.target_projection.eval()
 		print("Freezing target network projection.....")
 
 	def unfreeze_target_projection(self):
 		for name, param in self.target_projection.named_parameters():
 			param.requires_grad = True
-		# self.target_projection.train()
+		self.target_projection.train()
 		print("Unfreezing target network projection.....")
 
 	def freeze_classifier(self):
 		for name, param in self.classifier_fc.named_parameters():
 			param.requires_grad = False
-		# self.classifier_fc.eval()
+		self.classifier_fc.eval()
 		print("Freezing classifier fc.....")
 
 	def unfreeze_classifier(self):
 		for name, param in self.classifier_fc.named_parameters():
 			param.requires_grad = True
-		# self.classifier_fc.train()
+		self.classifier_fc.train()
 		print("Unfreezing classififer fc.....")
