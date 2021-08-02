@@ -222,7 +222,7 @@ def learn_supervised(args, network, device):
 																					  optimizer.param_groups[0]['lr']))
 			loss.backward()
 			optimizer.step()
-		if ep % 5 == 0:
+		if ep % 5 == 4 and ep > 0:
 			optimizer.param_groups[0]['lr'] *= 0.7
 
 	network.eval()
@@ -287,9 +287,13 @@ def learn_supervised(args, network, device):
 		torch.save(network.state_dict(), fileName, _use_new_zipfile_serialization = False)
 		csvFileTrain.close()
 		csvFileTest.close()
+	return top1acc
 
 
 def set_seed(sd):
+	if sd == -1:
+		sd = np.random.randint(0, 65536)
+	print("Setting seed to", sd)
 	torch.manual_seed(sd)
 	torch.backends.cudnn.benchmark = False
 	torch.backends.cudnn.deterministic = True
@@ -339,11 +343,69 @@ def run_experiments(args):
 	network.freeze_encoder_prediction()
 	network.freeze_target_backbone()
 	network.freeze_target_projection()
-	learn_supervised(args = args, network = network, device = device)
+	acc = learn_supervised(args = args, network = network, device = device)
+	return acc
+
+def eval_network(args):
+	assert args["resume"]
+	print(torch.cuda.get_device_name(0))
+	args["start"] = datetime.datetime.now()
+	rng = set_seed(args["seed"])
+	args["rng"] = rng
+	if args["saveName"] == "":
+		if args["distort"] == "transform":
+			args["saveName"] = "trained_model_cropped_" + args["distort"] + "_" + str(args["adj"])
+		else:
+			args["saveName"] = "trained_model_cropped_" + args["distort"]
+	args["saveName"] = outputDirectory + args["saveName"]
+	device = torch.device('cuda:0')
+	network = net.BYOLNet(numClasses = 12).to(device)
+	if args["resume"]:
+		if args["resumeFile"] == "":
+			raise RuntimeError("No file provided for model to start from.")
+		network.load_state_dict(torch.load(outputDirectory + args["resumeFile"]))
+		print("Loading network from", args["resumeFile"])
+		args["saveName"] = outputDirectory + args["resumeFile"]
+	pytorch_total_params = sum(p.numel() for p in network.parameters())
+	pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
+	print(pytorch_total_params, pytorch_total_params_train)
+	network.unfreeze_classifier()
+	network.freeze_encoder_backbone()
+	network.freeze_encoder_projection()
+	network.freeze_encoder_prediction()
+	network.freeze_target_backbone()
+	network.freeze_target_projection()
+
+	pytorch_total_params = sum(p.numel() for p in network.parameters())
+	pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
+	print(pytorch_total_params, pytorch_total_params_train)
+
+	acc = learn_supervised(args = args, network = network, device = device)
+	return acc
 
 
 if __name__ == "__main__":
 	if not os.path.isdir(outputDirectory):
 		os.mkdir(outputDirectory)
-	simclr_args = vars(parser.get_parser("SimCLR Parser"))
-	run_experiments(args = simclr_args)
+	byol_args = vars(parser.get_parser("SimCLR Parser"))
+	accs = []
+	fileName = ""
+	if byol_args['supervisedRep'] > 0:
+		assert byol_args['save']
+		fileName = byol_args["saveName"] + "_unsupervised_final.pt"
+	sup_acc = run_experiments(args = byol_args)
+	accs.append(sup_acc)
+	if byol_args['supervisedRep'] > 0:
+		byol_args['resume'] = True
+		byol_args['resumeFile'] = fileName
+		byol_args['save'] = False
+		for rep in range(byol_args["supervisedRep"]):
+			print("--------------------------------------------------------------------------")
+			print("Run ", str(rep + 1), "of ", str(byol_args["supervisedRep"]))
+			byol_args['seed'] = -1
+			sup_acc = eval_network(args = byol_args)
+			accs.append(sup_acc)
+	print("Accuracies:", accs)
+	print("Mean:", np.mean(np.asarray(accs)), "Std:", np.std(np.asarray(accs)))
+
+

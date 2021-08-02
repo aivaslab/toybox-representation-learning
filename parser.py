@@ -38,5 +38,7 @@ def get_parser(desc):
 	parser.add_argument('--workers', '-w', default = 4, type = int)
 	parser.add_argument('--ratio', '-rt', default = 0.5, type = float)
 	parser.add_argument('--gap', '-g', default = 2, type = int)
+	parser.add_argument('--interpolate', '-i', default = False, action = 'store_true')
+	parser.add_argument('--transfer', default = False, action = 'store_true')
 
 	return parser.parse_args()
