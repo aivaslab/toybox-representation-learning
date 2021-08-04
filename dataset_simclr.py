@@ -111,7 +111,7 @@ class data_simclr(torch.utils.data.Dataset):
 			actualIndex = self.indicesSelected[index]
 			img = np.array(cv2.imdecode(self.train_data[actualIndex], 3))
 			if self.split == "unsupervised":
-				label = -1
+				label = self.train_csvFile[actualIndex]['Class ID']
 			else:
 				label = self.train_csvFile[actualIndex]['Class ID']
 		else:

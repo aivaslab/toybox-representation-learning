@@ -11,6 +11,7 @@ import datetime
 
 import network as net
 from dataset_toybox import data_toybox
+from dataset_cifar import data_cifar10
 import parser
 
 outputDirectory = "./output/"
@@ -35,36 +36,38 @@ class UnNormalize(object):
 		return tensor
 
 
-
 def get_train_transform(tr):
 	s = 1
 	color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
 	if tr == 1:
-		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
-										  transforms.RandomHorizontalFlip(p = 0.5),
-										  transforms.RandomApply([color_jitter], p = 0.8),
-										  transforms.RandomGrayscale(p = 0.2),
-										  transforms.ToTensor(),
-										  transforms.Normalize(mean, std)])
+		transform = transforms.Compose([transforms.ToPILImage(), transforms.Resize(224),
+										transforms.RandomCrop(size = 224, padding = 25),
+										transforms.RandomHorizontalFlip(p = 0.5),
+										transforms.RandomApply([color_jitter], p = 0.8),
+										transforms.RandomGrayscale(p = 0.2),
+										transforms.ToTensor(),
+										transforms.Normalize(mean, std)])
 	elif tr == 2:
-		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
-										  transforms.RandomHorizontalFlip(p = 0.5),
-										  transforms.RandomApply([color_jitter], p = 0.8),
-										  transforms.ToTensor(),
-										  transforms.Normalize(mean, std)])
+		transform = transforms.Compose([transforms.ToPILImage(), transforms.Resize(224),
+										transforms.RandomCrop(size = 224, padding = 25),
+										transforms.RandomHorizontalFlip(p = 0.5),
+										transforms.RandomApply([color_jitter], p = 0.8),
+										transforms.ToTensor(),
+										transforms.Normalize(mean, std)])
 
 	elif tr == 3:
-		transform = transforms.Compose([transforms.ToPILImage(), transforms.RandomCrop(size = 224, padding = 25),
-							transforms.RandomHorizontalFlip(p = 0.5),
-							transforms.ToTensor(),
-							transforms.Normalize(mean, std)])
+		transform = transforms.Compose([transforms.ToPILImage(), transforms.Resize(224),
+										transforms.RandomCrop(size = 224, padding = 25),
+										transforms.RandomHorizontalFlip(p = 0.5),
+										transforms.ToTensor(),
+										transforms.Normalize(mean, std)])
 	elif tr == 4:
-		transform = transforms.Compose([transforms.ToPILImage(),
+		transform = transforms.Compose([transforms.ToPILImage(), transforms.Resize(224),
 							transforms.RandomHorizontalFlip(p = 0.5),
 							transforms.ToTensor(),
 							transforms.Normalize(mean, std)])
 	else:
-		transform = transforms.Compose([transforms.ToPILImage(),
+		transform = transforms.Compose([transforms.ToPILImage(), transforms.Resize(224),
 							transforms.RandomHorizontalFlip(p = 0.5),
 							transforms.RandomApply([color_jitter], p = 0.8),
 							transforms.ToTensor(),
@@ -121,22 +124,94 @@ def calc_accuracy(output, target, topk=(1,)):
 		return res, pred_1
 
 
+def get_dist_mat(act_a, act_b):
+	aR = torch.repeat_interleave(act_a, act_b.shape[0], dim = 0)
+	bR = act_b.repeat(act_a.shape[0], 1)
+	dist_mat = torch.sqrt(torch.pow(aR - bR, 2).sum(dim = 1))
+	dist_mat = dist_mat.view(act_a.shape[0], -1)
+	return dist_mat
+
+
+def get_dist(act_a, act_b):
+	distMat = None
+	for i in range(act_a.shape[0]):
+		dists = torch.sqrt(torch.pow(act_a[i] - act_b, 2).sum(dim = 1)).unsqueeze(0)
+		if distMat is None:
+			distMat = dists
+		else:
+			distMat = torch.cat((distMat, dists), dim = 0)
+
+	return distMat
+
+
+def knn_eval(network, trainData, testData):
+	trainActs = None
+	trainLabels = None
+	for _, (trainIms, _), labels in trainData:
+		with torch.no_grad():
+			activations = network.encoder_backbone(trainIms.cuda())
+			if trainActs is None:
+				trainActs = activations
+				trainLabels = labels
+			else:
+				trainActs = torch.cat((trainActs, activations))
+				trainLabels = torch.cat((trainLabels, labels))
+	# print("Train activation size:", trainActs.shape, trainLabels.shape)
+	testActs = None
+	testLabels = None
+	i = 0
+	for _, (_, testIms, labels) in enumerate(testData):
+		with torch.no_grad():
+			activations = network.encoder_backbone(testIms.cuda())
+			i += 1
+			if testActs is None:
+				testActs = activations
+				testLabels = labels
+			else:
+				testActs = torch.cat((testActs, activations))
+				testLabels = torch.cat((testLabels, labels))
+	# print("Test activation size:", testActs.shape, testLabels.shape)
+
+	dist_matrix = get_dist(act_a = testActs.cuda(), act_b = trainActs.cuda())
+	# print("Distance matrix:", dist_matrix.shape)
+	topkDist, topkInd = torch.topk(dist_matrix, k = 1, dim = 1, largest = False)
+	# print(topkInd.squeeze().cpu())
+	preds = trainLabels[topkInd.squeeze()]
+
+	# print(torch.eq(preds, testLabels).float().sum(),
+	acc = 100 * torch.eq(preds, testLabels).float().sum()/testLabels.shape[0]
+	return acc.numpy()
+
+
 def learn_unsupervised(args, network, device):
 	numEpochs = args['epochs1']
 	transform_train = get_train_transform(args["transform"])
+	transform_test = transforms.Compose([transforms.ToPILImage(), transforms.Resize(224), transforms.ToTensor(),
+										 transforms.Normalize(mean, std)])
 
-	trainData = data_toybox(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
+	if args['dataset'] == "toybox":
+		trainData = data_toybox(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
 							transform = transform_train, fraction = args['frac1'], distort = args['distort'], adj = args['adj'],
 							hyperTune = args["hypertune"])
+		testSet = data_toybox(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
+							  hyperTune = args["hypertune"], rng = args["rng"])
+	else:
+		trainData = data_cifar10(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
+							transform = transform_train, fraction = args['frac1'], distort = args['distort'], adj = args['adj'],
+							hyperTune = args["hypertune"])
+		testSet = data_cifar10(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
+							   hyperTune = args["hypertune"], rng = args["rng"])
+
 	trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size = args['batch_size'], shuffle = True,
 												  num_workers = 2)
+	testLoader = torch.utils.data.DataLoader(testSet, batch_size = args['batch_size'], shuffle = False)
 
 	optimizer = optimizers.SGD(network.encoder_backbone.parameters(), lr = args["lr"], weight_decay = 0.0005,
 							   momentum = 0.9)
 	optimizer.add_param_group({'params': network.encoder_projection.parameters()})
 	optimizer.add_param_group({'params': network.encoder_prediction.parameters()})
 
-	scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = 250, eta_min = 0.001)
+	scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max = numEpochs - 10, eta_min = 0.01)
 	show = False
 	for ep in range(numEpochs):
 		tqdmBar = tqdm.tqdm(trainDataLoader)
@@ -173,6 +248,9 @@ def learn_unsupervised(args, network, device):
 																						optimizer.param_groups[0][
 																							'lr'], network.beta))
 		network.update_momentum(ep + 1, numEpochs)
+		if ep % 2 == 1:
+			knn_acc = knn_eval(network = network, trainData = trainDataLoader, testData = testLoader)
+			print("knn accuracy:", knn_acc)
 		if ep > 8:
 			scheduler.step()
 		if args["saveRate"] != -1 and (ep + 1) % args["saveRate"] == 0 and args["save"]:
@@ -186,14 +264,25 @@ def learn_unsupervised(args, network, device):
 def learn_supervised(args, network, device):
 	transform_train = get_train_transform(args["transform"])
 
-	transform_test = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(),
+	transform_test = transforms.Compose([transforms.ToPILImage(), transforms.Resize(224), transforms.ToTensor(),
 										 transforms.Normalize(mean, std)])
-	trainSet = data_toybox(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
+
+	if args['dataset'] == "toybox":
+		trainSet = data_toybox(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
 						   fraction = args["frac2"], hyperTune = args["hypertune"], rng = args["rng"])
+
+		testSet = data_toybox(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
+							  hyperTune = args["hypertune"], rng = args["rng"])
+
+	else:
+		trainSet = data_cifar10(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
+							   fraction = args["frac2"], hyperTune = args["hypertune"], rng = args["rng"])
+
+		testSet = data_cifar10(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
+							  hyperTune = args["hypertune"], rng = args["rng"])
+
 	trainLoader = torch.utils.data.DataLoader(trainSet, batch_size = args['batch_size'], shuffle = True)
 
-	testSet = data_toybox(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
-						  hyperTune = args["hypertune"], rng = args["rng"])
 	testLoader = torch.utils.data.DataLoader(testSet, batch_size = args['batch_size'], shuffle = False)
 	pytorch_total_params = sum(p.numel() for p in network.parameters())
 	pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
