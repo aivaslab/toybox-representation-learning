@@ -174,12 +174,16 @@ def knn_eval(network, trainData, testData):
 
 	dist_matrix = get_dist(act_a = testActs.cuda(), act_b = trainActs.cuda())
 	# print("Distance matrix:", dist_matrix.shape)
-	topkDist, topkInd = torch.topk(dist_matrix, k = 1, dim = 1, largest = False)
+	topkDist, topkInd = torch.topk(dist_matrix, k = 200, dim = 1, largest = False)
+	# print(topkInd.shape)
+
 	# print(topkInd.squeeze().cpu())
 	preds = trainLabels[topkInd.squeeze()]
-
+	# print(preds.shape)
+	predsMode, _ = torch.mode(preds, dim = 1)
+	# print(predsMode.shape, predsMode[:50])
 	# print(torch.eq(preds, testLabels).float().sum(),
-	acc = 100 * torch.eq(preds, testLabels).float().sum()/testLabels.shape[0]
+	acc = 100 * torch.eq(predsMode, testLabels).float().sum()/testLabels.shape[0]
 	return acc.numpy()
 
 
@@ -248,7 +252,7 @@ def learn_unsupervised(args, network, device):
 																						optimizer.param_groups[0][
 																							'lr'], network.beta))
 		network.update_momentum(ep + 1, numEpochs)
-		if ep % 2 == 1:
+		if ep % 1 == 0:
 			knn_acc = knn_eval(network = network, trainData = trainDataLoader, testData = testLoader)
 			print("knn accuracy:", knn_acc)
 		if ep > 8:
