@@ -252,7 +252,7 @@ def learn_unsupervised(args, network, device):
 																						optimizer.param_groups[0][
 																							'lr'], network.beta))
 		network.update_momentum(ep + 1, numEpochs)
-		if ep % 50 == 0:
+		if (ep + 1) % 1000 == 0:
 			knn_acc = knn_eval(network = network, trainData = trainDataLoader, testData = testLoader)
 			print("knn accuracy:", knn_acc)
 		if ep > 8:
