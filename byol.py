@@ -252,7 +252,7 @@ def learn_unsupervised(args, network, device):
 																						optimizer.param_groups[0][
 																							'lr'], network.beta))
 		network.update_momentum(ep + 1, numEpochs)
-		if ep % 1 == 0:
+		if ep % 50 == 0:
 			knn_acc = knn_eval(network = network, trainData = trainDataLoader, testData = testLoader)
 			print("knn accuracy:", knn_acc)
 		if ep > 8:
@@ -315,7 +315,7 @@ def learn_supervised(args, network, device):
 																					  optimizer.param_groups[0]['lr']))
 			loss.backward()
 			optimizer.step()
-		if ep % 5 == 4 and ep > 0:
+		if ep % 20 == 19 and ep > 0:
 			optimizer.param_groups[0]['lr'] *= 0.7
 
 	network.eval()
@@ -484,8 +484,11 @@ if __name__ == "__main__":
 	accs = []
 	fileName = ""
 	if byol_args['supervisedRep'] > 0:
-		assert byol_args['save']
-		fileName = byol_args["saveName"] + "_unsupervised_final.pt"
+		assert byol_args['save'] or os.path.isfile(outputDirectory + byol_args['resumeFile'])
+		if not os.path.isfile(outputDirectory + byol_args['resumeFile']):
+			fileName = byol_args["saveName"] + "_unsupervised_final.pt"
+		else:
+			fileName = byol_args['resumeFile']
 	sup_acc = run_experiments(args = byol_args)
 	accs.append(sup_acc)
 	if byol_args['supervisedRep'] > 0:
