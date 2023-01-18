@@ -1,0 +1,354 @@
+GeForce GTX 1060 6GB
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Saving network weights to ./output/temp_unsupervised_final.pt
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 42.24458541986953 86.28308905128107
+Test Accuracies 1 and 5: 39.55040392994587 83.84264136884855
+Saving network weights to: ./output/temp_supervised.pt
+------------------------------------------------------------------------------------------------
+Starting linear evaluation for 5 reps
+------------------------------------------------------------------------------------------------
+Repetition 1 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 43.71034783759959 85.84554802012688
+Test Accuracies 1 and 5: 41.271513884972805 83.33333333333333
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 2 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 43.22905271367833 86.12994966275372
+Test Accuracies 1 and 5: 39.53284159701541 82.89427470457441
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 3 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 41.63202799761799 86.02056443959873
+Test Accuracies 1 and 5: 39.69090272068014 84.24657534246575
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 4 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 43.57908552925479 86.19558084738695
+Test Accuracies 1 and 5: 39.567966273595545 83.06989812231248
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 5 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 42.76963465909054 85.86742505774772
+Test Accuracies 1 and 5: 40.621707077481936 83.94801544682537
+------------------------------------------------------------------------------------------------
+The accuracies on the test set are: [41.271513884972805, 39.53284159701541, 39.69090272068014, 39.567966273595545, 40.621707077481936]
+Mean accuracy on test set is 40.136986310749165
+Std. deviation of accuracy on test set is 0.6942437965901308
+------------------------------------------------------------------------------------------------
+Starting linear evaluation for 5 reps
+------------------------------------------------------------------------------------------------
+Repetition 1 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 41.19448697314015 84.27040034335647
+Test Accuracies 1 and 5: 39.6557780213217 83.64945556726379
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 2 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 42.28833953767291 85.2767446998224
+Test Accuracies 1 and 5: 39.67334036765117 83.21039690098765
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 3 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 43.84161015262074 84.57667905531679
+Test Accuracies 1 and 5: 39.49771687889836 82.56059009483667
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 4 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 42.85714284712834 85.03609711407728
+Test Accuracies 1 and 5: 39.25184403028579 82.45521600882044
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 5 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 42.92277400714254 84.75169545142141
+Test Accuracies 1 and 5: 39.65577800390299 83.84264140636577
+------------------------------------------------------------------------------------------------
+The accuracies on the test set are: [39.6557780213217, 39.67334036765117, 39.49771687889836, 39.25184403028579, 39.65577800390299]
+Mean accuracy on test set is 39.546891460412
+Std. deviation of accuracy on test set is 0.16073146184444476
+------------------------------------------------------------------------------------------------
+Starting linear evaluation for 5 reps
+------------------------------------------------------------------------------------------------
+Repetition 1 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 40.05688032961027 82.93590021394218
+Test Accuracies 1 and 5: 38.408851439968764 82.34984193888303
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 2 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 40.12251148461722 84.18289213278601
+Test Accuracies 1 and 5: 38.18054091222754 83.17527225388532
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 3 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 39.75060161598087 83.41719536707245
+Test Accuracies 1 and 5: 39.88408853030431 82.99964874503401
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 4 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 40.756945960345924 83.98599869906054
+Test Accuracies 1 and 5: 38.303477348592935 82.19178085943503
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 5 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 39.88186393058475 83.48282650163308
+Test Accuracies 1 and 5: 38.33860203723217 83.28064631578333
+------------------------------------------------------------------------------------------------
+The accuracies on the test set are: [38.408851439968764, 38.18054091222754, 39.88408853030431, 38.303477348592935, 38.33860203723217]
+Mean accuracy on test set is 38.62311205366514
+Std. deviation of accuracy on test set is 0.6348150588304514
+The mean accuracies over the different evaluations are: [40.136986310749165, 39.546891460412, 38.62311205366514]
+Total time: 6546.499038696289 seconds
+GeForce GTX 1060 6GB
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Saving network weights to ./output/temp_unsupervised_final.pt
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 49.94530737590435 90.02406474939454
+Test Accuracies 1 and 5: 44.50298559887601 87.37267298911135
+Saving network weights to: ./output/temp_supervised.pt
+------------------------------------------------------------------------------------------------
+Starting linear evaluation for 5 reps
+------------------------------------------------------------------------------------------------
+Repetition 1 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 49.39838108821344 89.80529421963021
+Test Accuracies 1 and 5: 43.800491751056825 86.7053038285915
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 2 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 49.6609057069894 89.6959089847916
+Test Accuracies 1 and 5: 42.90481209227358 86.6526167815637
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 3 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 49.68278276672564 89.65215489452815
+Test Accuracies 1 and 5: 43.062873193159994 86.54724271162627
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 4 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 52.00175015823608 90.39597459591549
+Test Accuracies 1 and 5: 42.85212505395512 86.47699332630839
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 5 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 48.873331871525096 89.25836795196834
+Test Accuracies 1 and 5: 42.939936759474406 87.14436248682824
+------------------------------------------------------------------------------------------------
+The accuracies on the test set are: [43.800491751056825, 42.90481209227358, 43.062873193159994, 42.85212505395512, 42.939936759474406]
+Mean accuracy on test set is 43.11204776998399
+Std. deviation of accuracy on test set is 0.35114153797116626
+------------------------------------------------------------------------------------------------
+Starting linear evaluation for 5 reps
+------------------------------------------------------------------------------------------------
+Repetition 1 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 47.035659593921395 87.88011374063602
+Test Accuracies 1 and 5: 42.69406393698989 86.56480505795574
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 2 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 48.04200394120735 88.58017937846529
+Test Accuracies 1 and 5: 41.95644539852162 86.26624517035476
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 3 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 50.2297090360566 88.40516297067705
+Test Accuracies 1 and 5: 42.97506147759146 85.70425008781173
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 4 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 47.210676000040536 88.77707283055071
+Test Accuracies 1 and 5: 42.30769231305191 85.33544084437068
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 5 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 49.0045941798699 88.49267116789483
+Test Accuracies 1 and 5: 42.360379346680716 86.09062173653788
+------------------------------------------------------------------------------------------------
+The accuracies on the test set are: [42.69406393698989, 41.95644539852162, 42.97506147759146, 42.30769231305191, 42.360379346680716]
+Mean accuracy on test set is 42.45872849456712
+Std. deviation of accuracy on test set is 0.3483547936827803
+------------------------------------------------------------------------------------------------
+Starting linear evaluation for 5 reps
+------------------------------------------------------------------------------------------------
+Repetition 1 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 45.001093858390476 86.89564645350357
+Test Accuracies 1 and 5: 40.90270460267464 85.12469269645645
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 2 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 44.6948151355811 87.07066286129181
+Test Accuracies 1 and 5: 40.86757992475461 85.35300319873956
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 3 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 44.65106104281402 86.43622840809577
+Test Accuracies 1 and 5: 41.42957500327793 85.10713030457036
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 4 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 45.197987310475895 86.85189237659282
+Test Accuracies 1 and 5: 40.48120827736836 84.65050930000415
+------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------
+Repetition 5 of 5
+Loaded network weights from temp_unsupervised_final.pt
+Freezing classifier fc.
+11504832/11510988 parameters are trainable.
+Freezing backbone and unsupervised head.
+6156/11510988 parameters are trainable.
+Train Accuracies 1 and 5: 43.99474950442818 86.54561363125077
+Test Accuracies 1 and 5: 40.902704605354444 85.23006676639386
+------------------------------------------------------------------------------------------------
+The accuracies on the test set are: [40.90270460267464, 40.86757992475461, 41.42957500327793, 40.48120827736836, 40.902704605354444]
+Mean accuracy on test set is 40.916754482685995
+Std. deviation of accuracy on test set is 0.3018272083944354
+The mean accuracies over the different evaluations are: [43.11204776998399, 42.45872849456712, 40.916754482685995]
+Total time: 51927.042664051056 seconds

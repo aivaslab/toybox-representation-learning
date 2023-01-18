@@ -1,0 +1,25 @@
+self 4 : Train - 18.94(60.07), Test - 15.7(50.89) 
+!python3 simclr.py -e1 200 -e2 60 -lr_ft 0.005 -d self -f 0.1 -sv -sr 10 -sn colab_exp_self_4 -b 128 -ht -tr 4
+
+
+
+self 3 : Train - 26.75 (69.11), Test - 15.72(51.79)
+!python3 simclr.py -e1 200 -e2 60 -lr_ft 0.005 -d self -f 0.1 -sv -sr 10 -sn colab_exp_self_3 -b 128 -ht -tr 3
+
+
+
+
+self 2: Train - 39.203 (78.47), Test - 36.16(73.164)
+!python3 simclr.py -e1 200 -e2 60 -lr_ft 0.005 -d self -f 0.1 -sv -sr 10 -sn colab_exp_self_2 -b 128 -ht -tr 2
+!python3 simclr.py -e1 10 -e2 60 -lr_ft 0.005 -d self -f 0.1 -sv -sr 10 -b 128 -ht -tr 2 -r -rf colab_exp_self_2_unsupervised_190.pt -lr 0.01
+
+
+
+self 1: Train - 42.99 (80.4), Test - 37.214(74.78)
+!python3 simclr.py -e1 200 -e2 60 -lr_ft 0.005 -d self -f 0.1 -sv -sr 10 -sn colab_exp_self_1 -b 128 -ht -tr 1
+!python3 simclr.py -e1 10 -e2 60 -lr_ft 0.005 -d self -f 0.1 -sv -sr 10 -b 128 -ht -tr 1 -r -rf colab_exp_self_1_unsupervised_190.pt -lr 0.012
+
+
+
+object 4: Train - 46.182 (86.83), Test - 23.077 (55.48)
+!python3 simclr.py -e1 200 -e2 60 -lr_ft 0.005 -d object -f 0.1 -sv -sr 10 -sn colab_exp_object_4 -b 128 -ht -tr 4
