@@ -41,7 +41,7 @@ plt.show()
 def generate_filters(modelName):
 	modName = modelName + ".pt"
 	outFileName = modelName + ".png"
-	net = network.SimClRNet(numClasses = 12)
+	net = network.SimClRNet(num_classes= 12)
 	net.load_state_dict(torch.load(modName))
 	model_children = list(net.backbone.children())
 	print(model_children[0], type(model_children[0]), model_children[0].weight.shape)

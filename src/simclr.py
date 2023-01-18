@@ -1,6 +1,6 @@
+"""Module implementing the simclr method"""
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torchvision.transforms as transforms
 import torch.optim as optimizers
 import tqdm
@@ -10,19 +10,21 @@ import csv
 import datetime
 import pickle
 import utils
+import torch.utils.data
+import torch.backends.cudnn
 
 import network as simclr_net
-from dataset_toybox import data_toybox
+from dataset_toybox import ToyboxDataset
 from dataset_core50 import data_core50
-from gaussian_blur import GaussianBlur
 import parser
 
-outputDirectory = "./output/"
+outputDirectory = "../output/"
 mean = (0.3499, 0.4374, 0.5199)
 std = (0.1623, 0.1894, 0.1775)
 
 
 def get_train_transform(tr):
+    """Returns the train transform"""
     s = 1
     color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
     if tr == 1:
@@ -67,31 +69,32 @@ def get_train_transform(tr):
     return transform
 
 
-def learn_unsupervised(args, simclrNet, devices):
-    numEpochs = args['epochs1']
+def learn_unsupervised(args, simclr_network, devices):
+    """unsupervised part of the learning"""
+    num_epochs = args['epochs1']
     transform_train = get_train_transform(args["transform"])
     
     if args["dataset"] == "core50":
-        trainData = data_core50(root="./data", rng=args["rng"], train=True, nViews=2, size=224,
-                                transform=transform_train, fraction=args["frac1"], distort=args['distort'],
-                                adj=args['adj'],
-                                hyperTune=args["hypertune"], split_by_sess=args["sessionSplit"],
-                                distortArg=args["distortArg"])
+        train_data = data_core50(root="../data", rng=args["rng"], train=True, nViews=2, size=224,
+                                 transform=transform_train, fraction=args["frac1"], distort=args['distort'],
+                                 adj=args['adj'],
+                                 hyperTune=args["hypertune"], split_by_sess=args["sessionSplit"],
+                                 distortArg=args["distortArg"])
     else:
-        trainData = data_toybox(root="./data", rng=args["rng"], train=True, nViews=2, size=224,
-                                transform=transform_train, fraction=args["frac1"], distort=args['distort'],
-                                adj=args['adj'],
-                                hyperTune=args["hypertune"], distortArg=args["distortArg"],
-                                interpolate=args['interpolate'])
+        train_data = ToyboxDataset(root="../data", rng=args["rng"], train=True, n_views=2, size=224,
+                                   transform=transform_train, fraction=args["frac1"], distort=args['distort'],
+                                   adj=args['adj'],
+                                   hypertune=args["hypertune"], distort_arg=args["distortArg"],
+                                   interpolate=args['interpolate'])
     
-    trainDataLoader = torch.utils.data.DataLoader(trainData, batch_size=args['batch_size'], shuffle=True,
+    trainDataLoader = torch.utils.data.DataLoader(train_data, batch_size=args['batch_size'], shuffle=True,
                                                   num_workers=args['workers'])
     
-    optimizer = optimizers.SGD(simclrNet.backbone.parameters(), lr=args["lr"], weight_decay=args["weight_decay"],
+    optimizer = optimizers.SGD(simclr_network.backbone.parameters(), lr=args["lr"], weight_decay=args["weight_decay"],
                                momentum=0.9)
-    optimizer.add_param_group({'params': simclrNet.fc.parameters()})
+    optimizer.add_param_group({'params': simclr_network.fc.parameters()})
     
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(1.25 * numEpochs),
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(1.25 * num_epochs),
                                                            eta_min=0.1 * args["lr"])
     show = False
     train_losses = []
@@ -100,8 +103,8 @@ def learn_unsupervised(args, simclrNet, devices):
             if ep > 8:
                 scheduler.step()
     
-    netParallel = nn.DataParallel(simclrNet, device_ids=devices)
-    for ep in range(numEpochs):
+    netParallel = nn.DataParallel(simclr_network, device_ids=devices)
+    for ep in range(num_epochs):
         tqdmBar = tqdm.tqdm(trainDataLoader)
         b = 0
         avg_loss = 0.0
@@ -123,7 +126,7 @@ def learn_unsupervised(args, simclrNet, devices):
             avg_loss = (avg_loss * (b - 1) + loss.item()) / b
             loss.backward()
             optimizer.step()
-            tqdmBar.set_description("Epoch: {:d}/{:d}, Loss: {:.6f}, LR: {:.8f}".format(ep + 1, numEpochs, avg_loss,
+            tqdmBar.set_description("Epoch: {:d}/{:d}, Loss: {:.6f}, LR: {:.8f}".format(ep + 1, num_epochs, avg_loss,
                                                                                         optimizer.param_groups[0][
                                                                                             'lr']))
         
@@ -132,59 +135,60 @@ def learn_unsupervised(args, simclrNet, devices):
             scheduler.step()
         if args["saveRate"] != -1 and (ep + 1) % args["saveRate"] == 0 and args["save"]:
             fileName = args["saveName"] + "_unsupervised_" + str(ep + 1) + ".pt"
-            torch.save(simclrNet.state_dict(), fileName, _use_new_zipfile_serialization=False)
+            torch.save(simclr_network.state_dict(), fileName, _use_new_zipfile_serialization=False)
     if args["save"]:
         fileName = args["saveName"] + "_unsupervised_final.pt"
         print("Saving network weights to", fileName)
-        torch.save(simclrNet.state_dict(), fileName, _use_new_zipfile_serialization=False)
+        torch.save(simclr_network.state_dict(), fileName, _use_new_zipfile_serialization=False)
         fileName = args["saveName"] + "_train_losses.pickle"
         f = open(fileName, "wb")
         pickle.dump(train_losses, f, protocol=pickle.DEFAULT_PROTOCOL)
         f.close()
 
 
-def learn_supervised(args, simclrNet, devices, k):
+def learn_supervised(args, simclr_network, devices, k):
+    """Perform unsupervised learning"""
     transform_train = get_train_transform(args["transform"])
     
     transform_test = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(),
                                          transforms.Normalize(mean, std)])
     if args["dataset"] == "core50":
-        trainSet = data_core50(root="./data", train=True, transform=transform_train, split="super", size=224,
+        trainSet = data_core50(root="../data", train=True, transform=transform_train, split="super", size=224,
                                fraction=args["frac2"], hyperTune=args["hypertune"], rng=args["rng"],
                                split_by_sess=args["sessionSplit"])
     else:
         if not args['transfer']:
-            trainSet = data_toybox(root="./data", train=True, transform=transform_train, split="super", size=224,
-                                   fraction=args["frac2"], hyperTune=args["hypertune"], rng=args["rng"],
-                                   interpolate=args['interpolate'])
+            trainSet = ToyboxDataset(root="../data", train=True, transform=transform_train, split="super", size=224,
+                                     fraction=args["frac2"], hypertune=args["hypertune"], rng=args["rng"],
+                                     interpolate=args['interpolate'])
         else:
-            trainSet = data_core50(root="./data", train=True, transform=transform_train, split="super",
+            trainSet = data_core50(root="../data", train=True, transform=transform_train, split="super",
                                    size=224, fraction=args["frac2"], hyperTune=args["hypertune"], rng=args["rng"],
                                    split_by_sess=args["sessionSplit"])
-    trainLoader = torch.utils.data.DataLoader(trainSet, batch_size=args['batch_size'], shuffle=True, num_workers=
-    args['workers'])
+    trainLoader = torch.utils.data.DataLoader(trainSet, batch_size=args['batch_size'], shuffle=True,
+                                              num_workers=args['workers'])
     
     if args["dataset"] == "core50":
-        testSet = data_core50(root="./data", train=False, transform=transform_test, split="super", size=224,
+        testSet = data_core50(root="../data", train=False, transform=transform_test, split="super", size=224,
                               hyperTune=args["hypertune"], rng=args["rng"], split_by_sess=args["sessionSplit"])
     else:
-        testSet = data_toybox(root="./data", train=False, transform=transform_test, split="super", size=224,
-                              hyperTune=args["hypertune"], rng=args["rng"])
-    testLoader = torch.utils.data.DataLoader(testSet, batch_size=args['batch_size'], shuffle=False, num_workers=
-    args['workers'])
+        testSet = ToyboxDataset(root="../data", train=False, transform=transform_test, split="super", size=224,
+                                hypertune=args["hypertune"], rng=args["rng"])
+    testLoader = torch.utils.data.DataLoader(testSet, batch_size=args['batch_size'], shuffle=False,
+                                             num_workers=args['workers'])
     if args["freeze_backbone"]:
-        simclrNet.freeze_feat()
+        simclr_network.freeze_feat()
     else:
-        simclrNet.freeze_head()
-    pytorch_total_params = sum(p.numel() for p in simclrNet.parameters())
-    pytorch_total_params_train = sum(p.numel() for p in simclrNet.parameters() if p.requires_grad)
+        simclr_network.freeze_head()
+    pytorch_total_params = sum(p.numel() for p in simclr_network.parameters())
+    pytorch_total_params_train = sum(p.numel() for p in simclr_network.parameters() if p.requires_grad)
     print(str(pytorch_total_params_train) + "/" + str(pytorch_total_params) + " parameters are trainable.")
-    net = nn.DataParallel(simclrNet, device_ids=devices)
+    net = nn.DataParallel(simclr_network, device_ids=devices)
     
-    optimizer = torch.optim.SGD(simclrNet.classifier_fc.parameters(), lr=args["lr_ft"],
+    optimizer = torch.optim.SGD(simclr_network.classifier_fc.parameters(), lr=args["lr_ft"],
                                 weight_decay=args["weight_decay"])
     if not args["freeze_backbone"]:
-        optimizer.add_param_group({'params': simclrNet.backbone.parameters()})
+        optimizer.add_param_group({'params': simclr_network.backbone.parameters()})
     
     numEpochsS = args['epochs2']
     repEval = 10
@@ -199,15 +203,9 @@ def learn_supervised(args, simclrNet, devices, k):
             loss = nn.CrossEntropyLoss()(logits, labels.cuda())
             tot_loss += loss.item()
             ep_id += 1
-            tqdmBar.set_description("Repetition: {:d}/{:d} Epoch: {:d}/{:d} Loss: {:.4f}, LR: {:.8f}".format(k,
-                                                                                                             args[
-                                                                                                                 "supervisedRep"],
-                                                                                                             ep + 1,
-                                                                                                             numEpochsS,
-                                                                                                             tot_loss / ep_id,
-                                                                                                             optimizer.param_groups[
-                                                                                                                 0][
-                                                                                                                 'lr']))
+            tqdmBar.set_description("Repetition: {:d}/{:d} Epoch: {:d}/{:d} Loss: {:.4f}, LR: {:.8f}"
+                                    .format(k, args["supervisedRep"], ep + 1, numEpochsS, tot_loss / ep_id,
+                                            optimizer.param_groups[0]['lr']))
             loss.backward()
             optimizer.step()
         if ep % 5 == 0 and ep > 0:
@@ -305,7 +303,7 @@ def learn_supervised(args, simclrNet, devices, k):
     if args["save"]:
         fileName = args["saveName"] + "_supervised.pt"
         print("Saving network weights to:", fileName)
-        torch.save(simclrNet.state_dict(), fileName, _use_new_zipfile_serialization=False)
+        torch.save(simclr_network.state_dict(), fileName, _use_new_zipfile_serialization=False)
         csvFileTrain.close()
         csvFileTest.close()
     
@@ -313,6 +311,8 @@ def learn_supervised(args, simclrNet, devices, k):
 
 
 def set_seed(sd):
+    """Set the seed for the experiments
+    """
     if sd == -1:
         sd = np.random.randint(0, 65536)
     print("Setting seed to", sd)
@@ -324,6 +324,7 @@ def set_seed(sd):
 
 
 def train_unsupervised_and_supervised(args):
+    """Train the networks"""
     print(torch.cuda.get_device_name(0))
     numGPUs = torch.cuda.device_count()
     deviceIDs = [i for i in range(numGPUs)]
@@ -338,9 +339,9 @@ def train_unsupervised_and_supervised(args):
     args["saveName"] = outputDirectory + args["saveName"]
     # device = torch.device('cuda:0')
     if args["dataset"] == "toybox":
-        network = simclr_net.SimClRNet(numClasses=12).cuda()
+        network = simclr_net.SimClRNet(num_classes=12).cuda()
     else:
-        network = simclr_net.SimClRNet(numClasses=10).cuda()
+        network = simclr_net.SimClRNet(num_classes=10).cuda()
     if args["resume"]:
         if args["resumeFile"] == "":
             raise RuntimeError("No file provided for model to start from.")
@@ -360,18 +361,19 @@ def train_unsupervised_and_supervised(args):
         pytorch_total_params = sum(p.numel() for p in network.parameters())
         pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
         print(str(pytorch_total_params_train) + "/" + str(pytorch_total_params) + " parameters are trainable.")
-        learn_unsupervised(args=args, simclrNet=network, devices=deviceIDs)
+        learn_unsupervised(args=args, simclr_network=network, devices=deviceIDs)
     
     pytorch_total_params = sum(p.numel() for p in network.parameters())
     pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
     print(str(pytorch_total_params_train) + "/" + str(pytorch_total_params) + " parameters are trainable.")
     network.unsupervised = False
-    learn_supervised(args=args, simclrNet=network, devices=deviceIDs, k=1)
+    learn_supervised(args=args, simclr_network=network, devices=deviceIDs, k=1)
 
 
 def evaluate_trained_network(args):
-    numGPUs = torch.cuda.device_count()
-    deviceIDs = [i for i in range(numGPUs)]
+    """Evaluate the trained network"""
+    num_gpus = torch.cuda.device_count()
+    device_ids = [i for i in range(num_gpus)]
     args["start"] = datetime.datetime.now()
     args["saveName"] = outputDirectory + args["saveName"]
     if not args["resume"]:
@@ -383,26 +385,26 @@ def evaluate_trained_network(args):
             raise RuntimeError("No file provided for model to start from.")
         if args["saveName"] == "":
             args["saveName"] = outputDirectory + args["resumeFile"]
-    saveName = args["saveName"]
+    save_name = args["saveName"]
     accuracies = []
     args["seed"] = -1
     for i in range(args["supervisedRep"]):
         print("------------------------------------------------------------------------------------------------")
         print("Repetition " + str(i + 1) + " of " + str(args["supervisedRep"]))
-        args["saveName"] = saveName + "_" + str(i + 1)
+        args["saveName"] = save_name + "_" + str(i + 1)
         rng = set_seed(args["seed"])
         args["rng"] = rng
         if args["dataset"] == "toybox":
-            network = simclr_net.SimClRNet(numClasses=12).cuda()
+            network = simclr_net.SimClRNet(num_classes=12).cuda()
         else:
-            network = simclr_net.SimClRNet(numClasses=10).cuda()
+            network = simclr_net.SimClRNet(num_classes=10).cuda()
         network.load_state_dict(torch.load(outputDirectory + args["resumeFile"]))
         print("Loaded network weights from", args["resumeFile"])
         network.freeze_classifier()
         network.unsupervised = False
         if args["save"]:
-            configFileName = args["saveName"] + "_config.pickle"
-            configFile = open(configFileName, "wb")
+            config_file_name = args["saveName"] + "_config.pickle"
+            configFile = open(config_file_name, "wb")
             pickle.dump(args, configFile, pickle.DEFAULT_PROTOCOL)
             # print(args, file = configFile)
             configFile.close()
@@ -410,14 +412,14 @@ def evaluate_trained_network(args):
         pytorch_total_params = sum(p.numel() for p in network.parameters())
         pytorch_total_params_train = sum(p.numel() for p in network.parameters() if p.requires_grad)
         print(str(pytorch_total_params_train) + "/" + str(pytorch_total_params) + " parameters are trainable.")
-        top1, top5 = learn_supervised(args=args, simclrNet=network, devices=deviceIDs, k=i + 1)
+        top1, top5 = learn_supervised(args=args, simclr_network=network, devices=device_ids, k=i + 1)
         accuracies.append(top1)
         print("------------------------------------------------------------------------------------------------")
     print("The accuracies on the test set are:", accuracies)
     print("Mean accuracy on test set is", np.mean(np.asarray(accuracies)))
     print("Std. deviation of accuracy on test set is", np.std(np.asarray(accuracies)))
     if args["save"]:
-        fileName = saveName + "_test_accuracies.csv"
+        fileName = save_name + "_test_accuracies.csv"
         acc_file = open(fileName, "w")
         csv_acc = csv.writer(acc_file)
         for acc in accuracies:

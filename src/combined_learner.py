@@ -11,7 +11,7 @@ import datetime
 import pickle
 import utils
 import comb_network as simclr_net
-from dataset_toybox import data_toybox
+from dataset_toybox import ToyboxDataset
 from dataset_core50 import data_core50
 from gaussian_blur import GaussianBlur
 from pose_loader_core50 import pose_data_core50
@@ -159,9 +159,9 @@ def learn_supervised(args, simclrNet, devices, k):
 							 fraction = args["frac2"], hyperTune = args["hypertune"], rng = args["rng"],
 							 split_by_sess = args["sessionSplit"])
 	else:
-		trainSet = data_toybox(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
-							   fraction = args["frac2"], hyperTune = args["hypertune"], rng = args["rng"],
-							   interpolate = True)
+		trainSet = ToyboxDataset(root ="./data", train = True, transform = transform_train, split ="super", size = 224,
+								 fraction = args["frac2"], hypertune= args["hypertune"], rng = args["rng"],
+								 interpolate = True)
 	trainLoader = torch.utils.data.DataLoader(trainSet, batch_size = args['batch_size'], shuffle = True, num_workers =
 												args['workers'])
 
@@ -169,8 +169,8 @@ def learn_supervised(args, simclrNet, devices, k):
 		testSet = data_core50(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
 						  hyperTune = args["hypertune"], rng = args["rng"], split_by_sess = args["sessionSplit"])
 	else:
-		testSet = data_toybox(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
-							  hyperTune = args["hypertune"], rng = args["rng"], interpolate = True)
+		testSet = ToyboxDataset(root ="./data", train = False, transform = transform_test, split ="super", size = 224,
+								hypertune= args["hypertune"], rng = args["rng"], interpolate = True)
 	testLoader = torch.utils.data.DataLoader(testSet, batch_size = args['batch_size'], shuffle = False, num_workers =
 												args['workers'])
 	if args["freeze_backbone"]:

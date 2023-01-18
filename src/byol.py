@@ -10,7 +10,7 @@ import csv
 import datetime
 
 import network as net
-from dataset_toybox import data_toybox
+from dataset_toybox import ToyboxDataset
 from dataset_cifar import data_cifar10
 import parser
 
@@ -194,11 +194,11 @@ def learn_unsupervised(args, network, device):
 										 transforms.Normalize(mean, std)])
 
 	if args['dataset'] == "toybox":
-		trainData = data_toybox(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
-							transform = transform_train, fraction = args['frac1'], distort = args['distort'], adj = args['adj'],
-							hyperTune = args["hypertune"])
-		testSet = data_toybox(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
-							  hyperTune = args["hypertune"], rng = args["rng"])
+		trainData = ToyboxDataset(root ="./data", rng = args["rng"], train = True, n_views= 2, size = 224,
+								  transform = transform_train, fraction = args['frac1'], distort = args['distort'], adj = args['adj'],
+								  hypertune= args["hypertune"])
+		testSet = ToyboxDataset(root ="./data", train = False, transform = transform_test, split ="super", size = 224,
+								hypertune= args["hypertune"], rng = args["rng"])
 	else:
 		trainData = data_cifar10(root = "./data", rng = args["rng"], train = True, nViews = 2, size = 224,
 							transform = transform_train, fraction = args['frac1'], distort = args['distort'], adj = args['adj'],
@@ -281,11 +281,11 @@ def learn_supervised(args, network, device):
 										 transforms.Normalize(mean, std)])
 
 	if args['dataset'] == "toybox":
-		trainSet = data_toybox(root = "./data", train = True, transform = transform_train, split = "super", size = 224,
-						   fraction = args["frac2"], hyperTune = args["hypertune"], rng = args["rng"])
+		trainSet = ToyboxDataset(root ="./data", train = True, transform = transform_train, split ="super", size = 224,
+								 fraction = args["frac2"], hypertune= args["hypertune"], rng = args["rng"])
 
-		testSet = data_toybox(root = "./data", train = False, transform = transform_test, split = "super", size = 224,
-							  hyperTune = args["hypertune"], rng = args["rng"])
+		testSet = ToyboxDataset(root ="./data", train = False, transform = transform_test, split ="super", size = 224,
+								hypertune= args["hypertune"], rng = args["rng"])
 
 	else:
 		trainSet = data_cifar10(root = "./data", train = True, transform = transform_train, split = "super", size = 224,

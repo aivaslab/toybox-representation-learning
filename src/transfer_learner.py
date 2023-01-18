@@ -59,7 +59,7 @@ def run_transfer_learner(args):
 	if args['combined'] is True:
 		network = comb_network.SimClRNet(numClasses = 12).cuda()
 	else:
-		network = simclr_net.SimClRNet(numClasses = 12).cuda()
+		network = simclr_net.SimClRNet(num_classes= 12).cuda()
 
 	if args['model'] != "random":
 		fileName = "./pose_models/" + args['model']
@@ -286,7 +286,7 @@ def layer_eval(args):
 	if args['combined'] is True:
 		network = comb_network.SimClRNet(numClasses = 12).cuda()
 	else:
-		network = simclr_net.SimClRNet(numClasses = 12).cuda()
+		network = simclr_net.SimClRNet(num_classes= 12).cuda()
 
 	if args['model'] != "random":
 		fileName = "./pose_models/" + args['model']
