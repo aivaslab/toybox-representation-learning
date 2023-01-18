@@ -368,6 +368,58 @@ def train_unsupervised_and_supervised(args):
     print(str(pytorch_total_params_train) + "/" + str(pytorch_total_params) + " parameters are trainable.")
     network.unsupervised = False
     learn_supervised(args=args, simclr_network=network, devices=deviceIDs, k=1)
+    get_neuron_selectivities(simclr_network=network)
+    
+    
+def get_neuron_selectivities(simclr_network):
+    """Computes the neuron selectivities"""
+    transform_train = transforms.Compose([transforms.ToTensor(),
+                                          transforms.Normalize(mean=mean, std=std)])
+    train_set = ToyboxDataset(root="../data", train=True, transform=transform_train, split="super", size=224,
+                              fraction=0.1, hypertune=True, rng=np.random.default_rng(0),
+                              interpolate=False)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=128, shuffle=False)
+    targets = []
+    preds = []
+    simclr_network.freeze_all_params()
+    # switch to evaluate mode
+    simclr_network.eval()
+
+    with torch.no_grad():
+        for i, (_, images, target) in enumerate(train_loader):
+            images = images.cuda()
+        
+            # compute predictions
+            pred = simclr_network.forward_l4(images)
+            pred = torch.mean(pred, dim=(2, 3))
+        
+            targets.append(target.cpu().numpy())
+            preds.append(pred.cpu().numpy())
+    
+    targets = np.concatenate(targets, axis=0)
+    preds = np.concatenate(preds, axis=0)
+
+    print('Targets size:', targets.shape)
+    print('Preds size:', preds.shape)
+
+    n_classes = 12
+    n_neurons = preds.shape[1]
+    class_matrix_mean = np.zeros((n_neurons, n_classes))
+    class_matrix_std = np.zeros((n_neurons, n_classes))
+
+    for i in range(n_neurons):
+        for j in range(n_classes):
+            aux_vec = preds[targets == j, i]
+            class_matrix_mean[i, j] = np.mean(aux_vec)
+            class_matrix_std[i, j] = np.std(aux_vec)
+    sorted_mean = np.sort(class_matrix_mean, axis=1)
+    selectivity = (sorted_mean[:, -1] - np.mean(sorted_mean[:, :-1], axis=1)) / \
+                  (sorted_mean[:, -1] + np.mean(sorted_mean[:, :-1], axis=1))
+
+    print('Most selective 10 features:', np.argsort(selectivity)[-10:])
+    print('Highest 10 selectivities:', np.sort(selectivity)[-10:])
+    print('Selectivity shape:', selectivity.shape)
+    # np.save('selectivity_2.npy', selectivity)
 
 
 def evaluate_trained_network(args):
