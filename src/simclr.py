@@ -18,7 +18,7 @@ from dataset_toybox import ToyboxDataset
 from dataset_core50 import data_core50
 import parser
 
-outputDirectory = "../output/"
+outputDirectory = "../output_trial/"
 mean = (0.3499, 0.4374, 0.5199)
 std = (0.1623, 0.1894, 0.1775)
 
@@ -134,13 +134,13 @@ def learn_unsupervised(args, simclr_network, devices):
         if args["resume"] or ep > 8:
             scheduler.step()
         if args["saveRate"] != -1 and (ep + 1) % args["saveRate"] == 0 and args["save"]:
-            fileName = args["saveName"] + "_unsupervised_" + str(ep + 1) + ".pt"
+            fileName = args["saveName"] + "unsupervised_" + str(ep + 1) + ".pt"
             torch.save(simclr_network.state_dict(), fileName, _use_new_zipfile_serialization=False)
     if args["save"]:
-        fileName = args["saveName"] + "_unsupervised_final.pt"
+        fileName = args["saveName"] + "unsupervised_final.pt"
         print("Saving network weights to", fileName)
         torch.save(simclr_network.state_dict(), fileName, _use_new_zipfile_serialization=False)
-        fileName = args["saveName"] + "_train_losses.pickle"
+        fileName = args["saveName"] + "train_losses.pickle"
         f = open(fileName, "wb")
         pickle.dump(train_losses, f, protocol=pickle.DEFAULT_PROTOCOL)
         f.close()
@@ -245,17 +245,17 @@ def learn_supervised(args, simclr_network, devices, k):
     net.eval()
     
     if args["save"]:
-        fileName = args["saveName"] + "_test_predictions.csv"
+        fileName = args["saveName"] + "test_predictions.csv"
         csvFileTest = open(fileName, "w")
         csvWriterTest = csv.writer(csvFileTest)
         csvWriterTest.writerow(["Index", "True Label", "Predicted Label"])
         
-        fileName = args["saveName"] + "_train_predictions.csv"
+        fileName = args["saveName"] + "train_predictions.csv"
         csvFileTrain = open(fileName, "w")
         csvWriterTrain = csv.writer(csvFileTrain)
         csvWriterTrain.writerow(["Index", "True Label", "Predicted Label"])
         
-        fileName = args["saveName"] + "_train_indices.pickle"
+        fileName = args["saveName"] + "train_indices.pickle"
         selectedIndicesFile = open(fileName, "wb")
         pickle.dump(trainSet.indicesSelected, selectedIndicesFile, pickle.DEFAULT_PROTOCOL)
         selectedIndicesFile.close()
@@ -301,7 +301,7 @@ def learn_supervised(args, simclr_network, devices, k):
     print("Test Accuracies 1 and 5:", top1acc, top5acc)
     
     if args["save"]:
-        fileName = args["saveName"] + "_supervised.pt"
+        fileName = args["saveName"] + "supervised.pt"
         print("Saving network weights to:", fileName)
         torch.save(simclr_network.state_dict(), fileName, _use_new_zipfile_serialization=False)
         csvFileTrain.close()
@@ -333,10 +333,11 @@ def train_unsupervised_and_supervised(args):
     args["rng"] = rng
     if args["saveName"] == "":
         if args["distort"] == "transform":
-            args["saveName"] = "trained_model_cropped_" + args["distort"] + "_" + str(args["adj"])
+            args["saveName"] = "trained_model_cropped_" + args["distort"] + "_" + str(args["adj"]) + "/"
         else:
-            args["saveName"] = "trained_model_cropped_" + args["distort"]
+            args["saveName"] = "trained_model_cropped_" + args["distort"] + "/"
     args["saveName"] = outputDirectory + args["saveName"]
+    os.makedirs(args['saveName'], exist_ok=False)
     # device = torch.device('cuda:0')
     if args["dataset"] == "toybox":
         network = simclr_net.SimClRNet(num_classes=12).cuda()
@@ -348,10 +349,10 @@ def train_unsupervised_and_supervised(args):
         if args["epochsRan"] == -1:
             raise RuntimeError("Specify number of epochs ran for model which should be trained further.")
         network.load_state_dict(torch.load(outputDirectory + args["resumeFile"]))
-        args["saveName"] = outputDirectory + args["resumeFile"]
+        args["saveName"] = outputDirectory + args["resumeFile"] + "/"
     network.freeze_classifier()
     if args["save"]:
-        configFileName = args["saveName"] + "_config.pickle"
+        configFileName = args["saveName"] + "config.pickle"
         configFile = open(configFileName, "wb")
         pickle.dump(args, configFile, pickle.DEFAULT_PROTOCOL)
         # print(args, file = configFile)
@@ -368,59 +369,53 @@ def train_unsupervised_and_supervised(args):
     print(str(pytorch_total_params_train) + "/" + str(pytorch_total_params) + " parameters are trainable.")
     network.unsupervised = False
     learn_supervised(args=args, simclr_network=network, devices=deviceIDs, k=1)
-    get_neuron_selectivities(simclr_network=network)
+    calculate_train_test_activations(args=args, simclr_network=network)
     
     
-def get_neuron_selectivities(simclr_network):
-    """Computes the neuron selectivities"""
-    transform_train = transforms.Compose([transforms.ToTensor(),
-                                          transforms.Normalize(mean=mean, std=std)])
-    train_set = ToyboxDataset(root="../data", train=True, transform=transform_train, split="super", size=224,
-                              fraction=0.1, hypertune=True, rng=np.random.default_rng(0),
-                              interpolate=False)
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=128, shuffle=False)
+def get_activations(network, loader):
+    """Run data through network and get activations"""
     targets = []
     preds = []
-    simclr_network.freeze_all_params()
+    network.freeze_all_params()
     # switch to evaluate mode
-    simclr_network.eval()
+    network.eval()
 
     with torch.no_grad():
-        for i, (_, images, target) in enumerate(train_loader):
+        for i, (_, images, target) in enumerate(loader):
             images = images.cuda()
         
             # compute predictions
-            pred = simclr_network.forward_l4(images)
+            pred = network.forward_l4(images)
             pred = torch.mean(pred, dim=(2, 3))
         
             targets.append(target.cpu().numpy())
             preds.append(pred.cpu().numpy())
-    
+
     targets = np.concatenate(targets, axis=0)
     preds = np.concatenate(preds, axis=0)
+    return targets, preds
+    
+    
+def calculate_train_test_activations(args, simclr_network):
+    """Computes the neuron selectivities"""
+    transform_train = transforms.Compose([transforms.ToTensor(),
+                                          transforms.Normalize(mean=mean, std=std)])
+    train_set = ToyboxDataset(root="../data", train=True, transform=transform_train, split="super", size=224,
+                              fraction=0.5, hypertune=True, rng=np.random.default_rng(0),
+                              interpolate=False)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=128, shuffle=False)
+    targets, preds = get_activations(network=simclr_network, loader=train_loader)
+    np.save(args['saveName'] + "train_activations.npy", preds)
+    np.save(args['saveName'] + "train_targets.npy", targets)
 
-    print('Targets size:', targets.shape)
-    print('Preds size:', preds.shape)
-
-    n_classes = 12
-    n_neurons = preds.shape[1]
-    class_matrix_mean = np.zeros((n_neurons, n_classes))
-    class_matrix_std = np.zeros((n_neurons, n_classes))
-
-    for i in range(n_neurons):
-        for j in range(n_classes):
-            aux_vec = preds[targets == j, i]
-            class_matrix_mean[i, j] = np.mean(aux_vec)
-            class_matrix_std[i, j] = np.std(aux_vec)
-    sorted_mean = np.sort(class_matrix_mean, axis=1)
-    selectivity = (sorted_mean[:, -1] - np.mean(sorted_mean[:, :-1], axis=1)) / \
-                  (sorted_mean[:, -1] + np.mean(sorted_mean[:, :-1], axis=1))
-
-    print('Most selective 10 features:', np.argsort(selectivity)[-10:])
-    print('Highest 10 selectivities:', np.sort(selectivity)[-10:])
-    print('Selectivity shape:', selectivity.shape)
-    # np.save('selectivity_2.npy', selectivity)
-
+    test_set = ToyboxDataset(root="../data", train=False, transform=transform_train, split="super", size=224,
+                             fraction=0.5, hypertune=True, rng=np.random.default_rng(0),
+                             interpolate=False)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=128, shuffle=False)
+    targets, preds = get_activations(network=simclr_network, loader=test_loader)
+    np.save(args['saveName'] + "test_activations.npy", preds)
+    np.save(args['saveName'] + "test_targets.npy", targets)
+    
 
 def evaluate_trained_network(args):
     """Evaluate the trained network"""
@@ -443,7 +438,7 @@ def evaluate_trained_network(args):
     for i in range(args["supervisedRep"]):
         print("------------------------------------------------------------------------------------------------")
         print("Repetition " + str(i + 1) + " of " + str(args["supervisedRep"]))
-        args["saveName"] = save_name + "_" + str(i + 1)
+        args["saveName"] = save_name + "_" + str(i + 1) + "_"
         rng = set_seed(args["seed"])
         args["rng"] = rng
         if args["dataset"] == "toybox":
@@ -455,7 +450,7 @@ def evaluate_trained_network(args):
         network.freeze_classifier()
         network.unsupervised = False
         if args["save"]:
-            config_file_name = args["saveName"] + "_config.pickle"
+            config_file_name = args["saveName"] + "config.pickle"
             configFile = open(config_file_name, "wb")
             pickle.dump(args, configFile, pickle.DEFAULT_PROTOCOL)
             # print(args, file = configFile)
@@ -485,13 +480,14 @@ if __name__ == "__main__":
         os.mkdir(outputDirectory)
     simclr_args = vars(parser.get_parser("SimCLR Parser"))
     assert (simclr_args["dataset"] == "core50" or simclr_args["dataset"] == "toybox")
+    simclr_args['saveName'] += '/'
     saveName = simclr_args["saveName"]
     num_reps = simclr_args["supervisedRep"]
     simclr_args["supervisedRep"] = 1
     train_unsupervised_and_supervised(args=simclr_args)
     if num_reps > 0:
         simclr_args["resume"] = True
-        simclr_args["resumeFile"] = saveName + "_unsupervised_final.pt"
-        simclr_args["saveName"] = saveName + "_eval"
+        simclr_args["resumeFile"] = saveName + "unsupervised_final.pt"
+        simclr_args["saveName"] = saveName + "eval"
         simclr_args["supervisedRep"] = num_reps
         evaluate_trained_network(args=simclr_args)
