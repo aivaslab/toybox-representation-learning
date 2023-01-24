@@ -156,9 +156,10 @@ def get_parser():
     parser.add_argument("--reps", "-reps", default=5, type=int, help="Number of evaluation repetitions")
     parser.add_argument("--debug", "-debug", default=False, action='store_true', help="Use this flag for debugging "
                                                                                       "code...")
-    parser.add_argument("--train", "-t", default=False, action='store_true', help="Use flag to get curve for train "
-                                                                                  "images...")
+    parser.add_argument("--train", "-train", default=False, action='store_true', help="Use flag to get curve for train "
+                                                                                      "images...")
     parser.add_argument("--save-name", "-sv", required=True, type=str, help="Enter file path to save the accs...")
+    parser.add_argument("--seed", "-seed", default=1234, type=int, help="Enter the initial seed for the reps...")
     return vars(parser.parse_args())
 
 
@@ -172,22 +173,30 @@ def plot(accuracies):
         xs.append(k)
         ys.append(np.mean(accs))
         es.append(np.std(accs))
-    fig, ax = plt.subplots(1, 1, tight_layout=True)
+    fig, ax = plt.subplots(1, 1, tight_layout=True, figsize=(16, 9))
     ax.errorbar(xs, ys, yerr=es)
     ax.set_xlabel("Number of units ablated")
     ax.set_ylabel("Accuracy")
     plt.show()
+    
+
+def load_and_plot(f_name):
+    """Load the torch file and plot graph"""
+    accs = torch.load(OUTPUT_PATH + f_name)
+    plot(accs)
 
 
 def main():
     """Main method"""
     exp_args = get_parser()
     model = MaskedClassifier(args=exp_args)
-    rng = np.random.default_rng(0)
+    rng = np.random.default_rng(exp_args['seed'])
     seeds = rng.integers(0, 65536, exp_args['reps'])
     all_accuracies = model.do_forward_runs(seeds=seeds)
-    plot(all_accuracies)
+    # plot(all_accuracies)
+    return
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    sys.exit(main())
