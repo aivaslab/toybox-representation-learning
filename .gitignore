@@ -6,7 +6,15 @@ old data/
 results/
 pose_models/
 output/
+activations/
+output_trial/
+simclr_models/
+umap_out/
+notebooks/
+neuron_ablation/
+filter_images/
 .idea/
+src/.idea/
 *.py[cod]
 *$py.class
 
