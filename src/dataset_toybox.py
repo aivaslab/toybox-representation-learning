@@ -49,7 +49,7 @@ class ToyboxDataset(data_simclr):
     
     def __init__(self, root, rng, train=True, transform=None, n_views=2, size=224, split="unsupervised",
                  fraction=1.0, distort='self', adj=-1, hypertune=True, frac_by_object=False,
-                 distort_arg=False, interpolate=False):
+                 distort_arg=False, interpolate=False, umap=False):
         self.tr_start_key = 'Tr Start'
         self.tr_end_key = 'Tr End'
         self.obj_start_key = 'Obj Start'
@@ -57,6 +57,7 @@ class ToyboxDataset(data_simclr):
         self.tr_key = 'Transformation'
         self.cl_start_key = 'CL Start'
         self.cl_end_key = 'CL End'
+        self.umap = umap
         if not hypertune:
             if not interpolate:
                 self.trainImagesFile = "../data/toybox_data_cropped_train.pickle"

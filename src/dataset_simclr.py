@@ -179,4 +179,7 @@ class data_simclr(torch.utils.data.Dataset):
             if self.show:
                 # imgl.show()
                 self.show = False
-        return actualIndex, imgs, int(label)
+        if not self.umap:
+            return actualIndex, imgs, int(label)
+        else:
+            return index, imgs, int(label)
