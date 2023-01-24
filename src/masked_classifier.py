@@ -144,7 +144,7 @@ class MaskedClassifier:
             
         for k in all_runs_accuracies.keys():
             accs = all_runs_accuracies[k]
-            print(k, np.mean(accs), np.std(accs))
+            print("Units ablated: {:d}, Accuracy: {:.2f}({:.2f})".format(k, np.mean(accs), np.std(accs)))
             
         return all_runs_accuracies
 
