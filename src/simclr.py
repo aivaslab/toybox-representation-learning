@@ -337,7 +337,8 @@ def train_unsupervised_and_supervised(args):
         else:
             args["saveName"] = "trained_model_cropped_" + args["distort"] + "/"
     args["saveName"] = outputDirectory + args["saveName"]
-    os.makedirs(args['saveName'], exist_ok=False)
+    if args['save']:
+        os.makedirs(args['saveName'], exist_ok=False)
     # device = torch.device('cuda:0')
     if args["dataset"] == "toybox":
         network = simclr_net.SimClRNet(num_classes=12).cuda()
@@ -369,7 +370,8 @@ def train_unsupervised_and_supervised(args):
     print(str(pytorch_total_params_train) + "/" + str(pytorch_total_params) + " parameters are trainable.")
     network.unsupervised = False
     learn_supervised(args=args, simclr_network=network, devices=deviceIDs, k=1)
-    calculate_train_test_activations(args=args, simclr_network=network)
+    if args['save']:
+        calculate_train_test_activations(args=args, simclr_network=network)
     
     
 def get_activations(network, loader):
